@@ -184,6 +184,9 @@ body{
 .stats span{font-size:10.5px;color:#a897b8}
 .ranking{text-align:left;margin-bottom:18px}
 .ranking h3{font-family:var(--display);font-size:13px;color:#d9c6ea;margin:0 0 8px;font-weight:400}
+.ranking h3 small{font-family:var(--texto);font-size:11px;color:#9c8aa6;font-weight:700;letter-spacing:0}
+.puesto{margin:8px 0 0;font-size:12.5px;color:#b3a3c4;text-align:center}
+.puesto b{font-family:var(--display);color:var(--oro);font-size:13px}
 .ranking ol{list-style:none;margin:0;padding:0;display:grid;gap:4px;counter-reset:pos}
 .ranking li{
   counter-increment:pos;display:flex;justify-content:space-between;gap:10px;
@@ -313,8 +316,9 @@ body{
       <div><b id="statAltura">0</b><span>ALTURA MÁXIMA</span></div>
     </div>
     <div class="ranking">
-      <h3>Reyes del cerro</h3>
+      <h3>Reyes del cerro <small id="origenRanking">de este equipo</small></h3>
       <ol id="listaRanking"></ol>
+      <p class="puesto" id="tuPuesto" hidden></p>
     </div>
     <button class="jugar" id="btnOtra">Otra vuelta</button>
     <p class="pie">Pasa el mouse al siguiente.</p>
@@ -339,6 +343,47 @@ function mezcla(a, b, t) {
   const x = parseInt(a.slice(1), 16), y = parseInt(b.slice(1), 16);
   const c = i => Math.round(((x >> i) & 255) * (1 - t) + ((y >> i) & 255) * t);
   return `rgb(${c(16)},${c(8)},${c(0)})`;
+}
+
+/* ---------- ranking compartido (Supabase) ----------
+   La llave es la publicable: está hecha para ir en el navegador. La tabla
+   solo permite leer e insertar, así que lo peor que puede pasar es un
+   puntaje inventado; nadie puede borrar ni editar lo de otro. */
+const NUBE = {
+  url:'https://oxuyrhekatiuokhdlfgy.supabase.co/rest/v1/puntajes',
+  llave:'sb_publishable_VnIz3pmPt43jKE_0p2OnGQ_2R61zPts',
+};
+const cabeceras = extra => Object.assign({
+  apikey:NUBE.llave,
+  Authorization:'Bearer ' + NUBE.llave,
+  'Content-Type':'application/json',
+}, extra || {});
+
+async function subirPuntaje(marca) {
+  const r = await fetch(NUBE.url, {
+    method:'POST',
+    headers:cabeceras({Prefer:'return=representation'}),
+    body:JSON.stringify({nombre:marca.nombre, puntaje:marca.puntaje, cortes:marca.cortes}),
+  });
+  if (!r.ok) throw new Error('no se pudo guardar: ' + r.status);
+  const filas = await r.json();
+  return filas[0] && filas[0].id;
+}
+
+async function bajarTop(cuantos) {
+  const r = await fetch(`${NUBE.url}?select=id,nombre,puntaje&order=puntaje.desc,creado.asc&limit=${cuantos}`,
+    {headers:cabeceras()});
+  if (!r.ok) throw new Error('no se pudo leer: ' + r.status);
+  return r.json();
+}
+
+/* cuántos le ganan, para mostrar el puesto de quien no entra al top */
+async function contarMejores(puntaje) {
+  const r = await fetch(`${NUBE.url}?select=id&puntaje=gt.${puntaje}`,
+    {headers:cabeceras({Prefer:'count=exact', Range:'0-0'})});
+  const rango = r.headers.get('content-range') || '';
+  const total = Number(rango.split('/')[1]);
+  return Number.isFinite(total) ? total : null;
 }
 
 /* ---------- lienzo ---------- */
@@ -1651,7 +1696,7 @@ function terminar() {
   $('statCombo').textContent = j.mejorCombo;
   $('statAltura').textContent = j.altura + ' m';
 
-  const marca = {nombre:j.nombre, puntaje:j.puntaje, sello:Date.now()};
+  const marca = {nombre:j.nombre, puntaje:j.puntaje, cortes:j.cortes, sello:Date.now()};
   let tabla = [];
   try { tabla = JSON.parse(leer('volantin:ranking') || '[]'); } catch (e) { tabla = []; }
   const mejorAntes = tabla.reduce((m, r) => Math.max(m, r.puntaje || 0), 0);
@@ -1663,12 +1708,44 @@ function terminar() {
   tabla.sort((a, b) => b.puntaje - a.puntaje);
   tabla = tabla.slice(0, 8);
   guardar('volantin:ranking', JSON.stringify(tabla));
-  $('listaRanking').innerHTML = tabla.map(r => `
-    <li class="${r.sello === marca.sello ? 'yo' : ''}">
-      <span>${String(r.nombre).replace(/[<>&]/g, '')}</span><b>${r.puntaje.toLocaleString('es-CL')}</b>
-    </li>`).join('');
-
+  pintarLista(tabla.map(r => ({nombre:r.nombre, puntaje:r.puntaje, mio:r.sello === marca.sello})));
   $('pantallaFinal').hidden = false;
+  sincronizar(marca);
+}
+
+function limpio(t) {
+  return String(t).replace(/[<>&]/g, '');
+}
+
+function pintarLista(filas) {
+  $('listaRanking').innerHTML = filas.map(f => `
+    <li class="${f.mio ? 'yo' : ''}">
+      <span>${limpio(f.nombre)}</span><b>${f.puntaje.toLocaleString('es-CL')}</b>
+    </li>`).join('');
+}
+
+/* Sube el puntaje y trae el ranking de todo el equipo. Si no hay internet,
+   se queda con la lista local y lo dice, sin romper nada. */
+async function sincronizar(marca) {
+  const origen = $('origenRanking'), puesto = $('tuPuesto');
+  if (marca.puntaje <= 0) { origen.textContent = 'de este equipo'; return; }
+  origen.textContent = 'cargando el del equipo…';
+  puesto.hidden = true;
+  try {
+    const mio = await subirPuntaje(marca);
+    const top = await bajarTop(10);
+    pintarLista(top.map(r => ({nombre:r.nombre, puntaje:r.puntaje, mio:r.id === mio})));
+    origen.textContent = 'de todos, en vivo';
+    if (!top.some(r => r.id === mio)) {
+      const mejores = await contarMejores(marca.puntaje);
+      if (mejores !== null) {
+        puesto.innerHTML = `Quedaste en el puesto <b>#${mejores + 1}</b>`;
+        puesto.hidden = false;
+      }
+    }
+  } catch (e) {
+    origen.textContent = 'sin conexión: solo este equipo';
+  }
 }
 
 function volverAlInicio() {
