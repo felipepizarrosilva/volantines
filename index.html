@@ -201,6 +201,29 @@ body{
 }
 .marcaRecord[hidden]{display:none}
 @keyframes latir{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
+.botones{display:flex;gap:8px;margin-top:12px}
+.botones .jugar{margin-top:0;flex:1 1 50%;min-width:0;font-size:clamp(13px,2.3vw,17px);padding:15px 8px}
+.jugar.multi{background:var(--azul);box-shadow:0 7px 0 #0d2d6a}
+.jugar.multi:active{box-shadow:0 0 0 #0d2d6a}
+.salir{
+  width:100%;margin-top:10px;padding:11px;border-radius:10px;cursor:pointer;
+  background:none;border:2px solid rgba(255,244,224,.25);color:#c3b2d6;
+  font-family:var(--texto);font-weight:900;font-size:13px
+}
+.salir:hover{border-color:var(--rosa);color:var(--rosa)}
+.cupo{font-family:var(--display);font-size:clamp(44px,11vw,64px);margin:0;line-height:1}
+.cupo small{display:block;font-family:var(--texto);font-size:12px;color:#9c8aa6;letter-spacing:1px;margin-top:4px}
+.espera{
+  list-style:none;margin:18px 0 0;padding:0;
+  display:flex;flex-wrap:wrap;gap:6px;justify-content:center
+}
+.espera li{
+  background:rgba(255,244,224,.08);border:1.5px solid rgba(255,244,224,.18);
+  border-radius:20px;padding:5px 12px;font-size:12.5px
+}
+.espera li.yo{background:var(--oro);border-color:var(--oro);color:#2a1a06;font-weight:900}
+.estadoSala{margin:16px 0 4px;font-size:14px;color:#e2d2ef;min-height:22px}
+.estadoSala.contando{font-family:var(--display);font-size:clamp(20px,5vw,30px);color:var(--oro)}
 .rango{font-family:var(--display);font-size:clamp(22px,5.5vw,34px);color:var(--oro);margin:0 0 6px}
 .final{font-family:var(--display);font-size:clamp(50px,13vw,76px);margin:0;line-height:1}
 .final small{display:block;font-family:var(--texto);font-size:12px;color:#9c8aa6;letter-spacing:1px;margin-top:4px}
@@ -226,25 +249,30 @@ body{
 
 @media (max-height:780px){
   .pantalla{padding:16px}
-  .marca{width:96px;margin-bottom:10px}
-  .titulo{font-size:clamp(34px,7.5vw,54px)}
-  .bajada{margin:10px auto 14px;font-size:14px}
-  .regla{padding:9px 12px;margin-bottom:8px;grid-template-columns:58px 1fr}
-  .regla svg{width:58px;height:40px}
-  .regla p{font-size:12.5px}
-  .comodines{margin-top:10px}
+  .marca{width:82px;margin-bottom:7px}
+  .titulo{font-size:clamp(30px,6.6vw,46px)}
+  .bajada{margin:8px auto 10px;font-size:13px}
+  .regla{padding:7px 11px;margin-bottom:6px;grid-template-columns:52px 1fr}
+  .regla svg{width:52px;height:36px}
+  .regla p{font-size:12px;line-height:1.35}
+  .comodines{margin-top:8px}
+  .comodines span{font-size:11px;padding:3px 8px}
   .comodines span{font-size:11.5px;padding:4px 9px}
   .nota{margin-top:7px}
   .campos{margin-top:10px}
   .nombre{padding:11px 14px}
   .ayudaSala{font-size:11px;margin-top:6px}
   .jugar{margin-top:9px;padding:13px;font-size:19px}
+  .botones{margin-top:9px}
+  .botones .jugar{padding:12px 8px}
   .pie{margin-top:9px}
   .stats{margin:14px 0}
   .ranking{margin-bottom:12px}
 }
 @media (max-width:560px){
   .campos{flex-direction:column}
+  .botones{flex-direction:column}
+  .botones .jugar{font-size:17px}
   .placa{gap:12px;padding:7px 11px}
   .regla{grid-template-columns:62px 1fr;gap:10px}
   .regla svg{width:62px;height:46px}
@@ -337,9 +365,23 @@ body{
       <input class="nombre" id="inputNombre" maxlength="14" placeholder="Tu nombre" autocomplete="off">
       <input class="nombre sala" id="inputSala" maxlength="10" placeholder="Sala: ej FONDA" autocomplete="off">
     </div>
-    <p class="ayudaSala" id="ayudaSala">Escribe el mismo código que tus compañeros para volar juntos, hasta 8 en el mismo cielo.</p>
-    <button class="jugar" id="btnJugar">Soltar el volantín</button>
+    <p class="ayudaSala" id="ayudaSala">Para jugar con otros, escriban el mismo código de sala: la partida parte cuando se llenan los 8, o cuando alguien decide partir antes.</p>
+    <div class="botones">
+      <button class="jugar" id="btnJugar">Un jugador</button>
+      <button class="jugar multi" id="btnMulti">Multijugador online</button>
+    </div>
     <p class="pie">Mouse, flechas, o los botones en pantalla si juegas en el celular. Dura 2 minutos, y los últimos 30 segundos se ponen feos.</p>
+  </div>
+</section>
+
+<section class="pantalla" id="pantallaSala" hidden>
+  <div class="tarjeta">
+    <p class="rango" id="tituloSala">Sala</p>
+    <p class="cupo"><span id="cupo">1</span><small id="cupoTexto">de 8 en el cielo</small></p>
+    <ol class="espera" id="listaEspera"></ol>
+    <p class="estadoSala" id="estadoSala">Esperando a que llegue el resto…</p>
+    <button class="jugar" id="btnPartir">Partir ahora</button>
+    <button class="salir" id="btnSalirSala">Salir de la sala</button>
   </div>
 </section>
 
@@ -495,7 +537,9 @@ function cerrarCielo() {
 }
 
 function recibirVecino(d) {
-  if (!d || d.id === MI_ID) return;
+  if (!d) return;
+  if (sala.activa) recibirEspera(d);
+  if (d.id === MI_ID) return;
   if (d.t === 'chao') { cielo.vecinos.delete(d.id); return; }
   if (d.t === 'hola') { mandarPosicion(); return; }
   if (d.t !== 'pos') return;
@@ -531,6 +575,131 @@ function pintarSala(ahora) {
   $('listaSala').innerHTML = filas.slice(0, SALA_MAX).map(f =>
     `<li class="${f.mio ? 'yo' : ''}"><span>${limpio(f.nombre)}</span><b>${f.pts.toLocaleString('es-CL')}</b></li>`
   ).join('');
+}
+
+/* ---------- sala de espera: se parte cuando se llena, con cuenta regresiva ---------- */
+const sala = {
+  activa:false, codigo:null, aviso:null, cuenta:0, reloj:null, esperando:new Map(),
+};
+
+function anfitrion() {
+  /* el de id más bajo manda; así nadie tiene que ser el servidor */
+  let menor = MI_ID;
+  sala.esperando.forEach((v, id) => { if (id < menor) menor = id; });
+  return menor === MI_ID;
+}
+
+function gente() {
+  return sala.esperando.size + 1;
+}
+
+function pintarEspera() {
+  $('cupo').textContent = gente();
+  $('cupoTexto').textContent = `de ${SALA_MAX} en el cielo`;
+  const nombres = [{n:($('inputNombre').value || 'Anónimo').slice(0, 14), mio:true}];
+  sala.esperando.forEach(v => nombres.push({n:v.nombre, mio:false}));
+  $('listaEspera').innerHTML = nombres.map(x =>
+    `<li class="${x.mio ? 'yo' : ''}">${limpio(x.n)}</li>`).join('');
+  $('btnPartir').hidden = gente() < 2 || sala.cuenta > 0;
+  if (sala.cuenta <= 0) {
+    $('estadoSala').classList.remove('contando');
+    $('estadoSala').textContent = gente() >= SALA_MAX
+      ? '¡Sala llena! Partimos…'
+      : `Faltan ${SALA_MAX - gente()} para llenar la sala. Pueden partir antes si quieren.`;
+  }
+}
+
+function recibirEspera(d) {
+  if (!sala.activa || !d || d.id === MI_ID) return;
+  if (d.t === 'esp') {
+    sala.esperando.set(d.id, {nombre:String(d.n || '').slice(0, 14), visto:performance.now()});
+    pintarEspera();
+  }
+  if (d.t === 'chao') { sala.esperando.delete(d.id); pintarEspera(); }
+  if (d.t === 'ya' && sala.cuenta <= 0) arrancarCuenta();
+}
+
+function arrancarCuenta() {
+  sala.cuenta = 5;
+  $('btnPartir').hidden = true;
+  const tic = () => {
+    if (!sala.activa) return;
+    const e = $('estadoSala');
+    e.classList.add('contando');
+    e.textContent = sala.cuenta > 0 ? `¡Partimos en ${sala.cuenta}!` : '¡Ya!';
+    beep(sala.cuenta > 0 ? 660 : 1040, .12, 'triangle', .05);
+    if (sala.cuenta <= 0) {
+      clearInterval(sala.reloj);
+      salirSala(true);
+      arrancarRonda();
+      return;
+    }
+    sala.cuenta--;
+  };
+  tic();
+  sala.reloj = setInterval(tic, 1000);
+}
+
+async function entrarSala() {
+  const codigo = ($('inputSala').value || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10);
+  const ayuda = $('ayudaSala');
+  ayuda.classList.remove('malo');
+  if (!codigo) {
+    ayuda.textContent = 'Escribe un código de sala para jugar con otros. El mismo que tus compañeros.';
+    ayuda.classList.add('malo');
+    $('inputSala').focus();
+    return;
+  }
+  guardar('volantin:sala', codigo);
+  guardar('volantin:ultimoNombre', ($('inputNombre').value || '').trim().slice(0, 14) || 'Anónimo');
+  ayuda.textContent = 'Entrando a la sala ' + codigo + '…';
+  $('btnMulti').disabled = true;
+  cerrarCielo();
+  const entró = await abrirCielo(codigo);
+  $('btnMulti').disabled = false;
+  if (!entró) {
+    ayuda.textContent = 'No se pudo entrar a la sala. Revisa tu conexión o juega solo.';
+    ayuda.classList.add('malo');
+    return;
+  }
+
+  sala.activa = true;
+  sala.codigo = codigo;
+  sala.cuenta = 0;
+  sala.esperando.clear();
+  $('tituloSala').textContent = 'Sala ' + codigo;
+  $('estadoSala').classList.remove('contando');
+  $('pantallaInicio').hidden = true;
+  $('pantallaSala').hidden = false;
+  pintarEspera();
+
+  mandar({t:'esp', id:MI_ID, n:($('inputNombre').value || 'Anónimo').slice(0, 14)});
+  clearInterval(sala.aviso);
+  sala.aviso = setInterval(() => {
+    if (!sala.activa) return;
+    mandar({t:'esp', id:MI_ID, n:($('inputNombre').value || 'Anónimo').slice(0, 14)});
+    const ahora = performance.now();
+    let cambió = false;
+    sala.esperando.forEach((v, id) => {
+      if (ahora - v.visto > 4000) { sala.esperando.delete(id); cambió = true; }
+    });
+    if (cambió) pintarEspera();
+    if (sala.cuenta <= 0 && gente() >= SALA_MAX && anfitrion()) { mandar({t:'ya'}); arrancarCuenta(); }
+  }, 1000);
+}
+
+function salirSala(siguiendo) {
+  sala.activa = false;
+  clearInterval(sala.aviso);
+  clearInterval(sala.reloj);
+  sala.esperando.clear();
+  sala.cuenta = 0;
+  $('pantallaSala').hidden = true;
+  if (!siguiendo) {
+    mandar({t:'chao', id:MI_ID});
+    cerrarCielo();
+    $('pantallaInicio').hidden = false;
+  }
 }
 
 /* ---------- lienzo ---------- */
@@ -860,7 +1029,8 @@ window.addEventListener('blur', () => {
   mandos.querySelectorAll('.mando').forEach(b => b.classList.remove('apretado'));
 });
 window.addEventListener('keydown', e => {
-  if (!$('pantallaInicio').hidden) { if (e.key === 'Enter') comenzar(); return; }
+  if (!$('pantallaSala').hidden) { if (e.key === 'Escape') salirSala(false); return; }
+  if (!$('pantallaInicio').hidden) { if (e.key === 'Enter') jugarSolo(); return; }
   if (!$('pantallaFinal').hidden) { if (e.key === 'Enter') volverAlInicio(); return; }
   teclas[e.key] = true;
   if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key)) e.preventDefault();
@@ -1781,43 +1951,15 @@ function paso(ts) {
 }
 
 /* ---------- inicio y fin ---------- */
-async function comenzar() {
+function arrancarRonda() {
   const nombre = ($('inputNombre').value || '').trim().slice(0, 14) || 'Anónimo';
   guardar('volantin:ultimoNombre', nombre);
-
-  const sala = ($('inputSala').value || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10);
-  guardar('volantin:sala', sala);
-  const ayuda = $('ayudaSala');
-  ayuda.classList.remove('malo');
-  cerrarCielo();
-  if (sala) {
-    ayuda.textContent = 'Entrando a la sala ' + sala + '…';
-    const botón = $('btnJugar');
-    botón.disabled = true;
-    const entró = await abrirCielo(sala);
-    botón.disabled = false;
-    if (entró) {
-      mandar({t:'hola', id:MI_ID});
-      await new Promise(r => setTimeout(r, 900));
-      if (cielo.vecinos.size >= SALA_MAX) {
-        cerrarCielo();
-        ayuda.textContent = `La sala ${sala} está llena (${SALA_MAX} de ${SALA_MAX}). Prueba con otro código.`;
-        ayuda.classList.add('malo');
-        return;
-      }
-      ayuda.textContent = `Sala ${sala}: ${cielo.vecinos.size + 1} en el cielo.`;
-    } else {
-      ayuda.textContent = 'No se pudo entrar a la sala; juegas solo igual.';
-      ayuda.classList.add('malo');
-    }
-  } else {
-    ayuda.textContent = 'Escribe el mismo código que tus compañeros para volar juntos, hasta 8 en el mismo cielo.';
-  }
   redimensionar();
   j = nuevoJuego(nombre);
   for (let i = 0; i < 5; i++) nacerNube(true);
   for (let i = 0; i < 2; i++) nacerRamada(true);
   $('pantallaInicio').hidden = true;
+  $('pantallaSala').hidden = true;
   $('pantallaFinal').hidden = true;
   $('combo').classList.remove('activo');
   filtroActual = 'x'; aplicarFiltro();
@@ -1826,6 +1968,15 @@ async function comenzar() {
   sonarCueca();
   requestAnimationFrame(paso);
 }
+
+/* un jugador: sin sala, sin esperar a nadie */
+function jugarSolo() {
+  cerrarCielo();
+  $('ayudaSala').classList.remove('malo');
+  $('ayudaSala').textContent = 'Para jugar con otros, escribe un código de sala y usa el botón azul.';
+  arrancarRonda();
+}
+
 
 function rangoPara(p) {
   if (p >= 22000) return '¡Leyenda del cerro!';
@@ -1974,7 +2125,14 @@ function volverAlInicio() {
   $('inputNombre').focus({preventScroll:true});
 }
 
-$('btnJugar').addEventListener('click', comenzar);
+$('btnJugar').addEventListener('click', jugarSolo);
+$('btnMulti').addEventListener('click', entrarSala);
+$('btnPartir').addEventListener('click', () => {
+  if (sala.cuenta > 0 || gente() < 2) return;
+  mandar({t:'ya'});
+  arrancarCuenta();
+});
+$('btnSalirSala').addEventListener('click', () => salirSala(false));
 $('btnOtra').addEventListener('click', volverAlInicio);
 $('inputNombre').value = leer('volantin:ultimoNombre') || '';
 $('inputSala').value = leer('volantin:sala') || '';
