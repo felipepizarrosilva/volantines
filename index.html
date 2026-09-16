@@ -223,6 +223,17 @@ body{
   border-radius:20px;padding:5px 12px;font-size:12.5px
 }
 .espera li.yo{background:var(--oro);border-color:var(--oro);color:#2a1a06;font-weight:900}
+.invitacion{
+  margin:12px 0 0;font-size:13px;color:#2a1a06;background:var(--oro);
+  border-radius:20px;padding:7px 14px;font-weight:900
+}
+.invitacion[hidden]{display:none}
+.compartir{margin:14px 0 0;font-size:12px;color:#9c8aa6;line-height:1.6}
+.compartir code{
+  display:inline-block;margin-top:5px;font-size:12px;color:var(--papel);
+  background:rgba(255,244,224,.08);border-radius:8px;padding:5px 10px;
+  word-break:break-all;max-width:100%
+}
 .estadoSala{margin:16px 0 4px;font-size:14px;color:#e2d2ef;min-height:22px}
 .estadoSala.contando{font-family:var(--display);font-size:clamp(20px,5vw,30px);color:var(--oro)}
 .rango{font-family:var(--display);font-size:clamp(22px,5.5vw,34px);color:var(--oro);margin:0 0 6px}
@@ -361,6 +372,7 @@ body{
     <p class="nota">Los verdes te ayudan. Los rojos te complican la vida.</p>
 
     <input class="nombre" id="inputNombre" maxlength="14" placeholder="Tu nombre" autocomplete="off">
+    <p class="invitacion" id="invitacion" hidden></p>
     <div class="botones">
       <button class="jugar" id="btnJugar">Un jugador</button>
       <button class="jugar multi" id="btnMulti">Multijugador online</button>
@@ -372,10 +384,10 @@ body{
 <section class="pantalla" id="pantallaMulti" hidden>
   <div class="tarjeta">
     <p class="rango">Multijugador</p>
-    <p class="bajada">Vuelen juntos en el mismo cielo, hasta 8 en una sala. Inventa un código y pásaselo a tu equipo, o escribe el que te dieron.</p>
+    <p class="bajada">Hasta 8 volantines en el mismo cielo. <b>Escribe el código que te dieron</b> para entrar a esa sala, o inventa uno y pásaselo a tu equipo.</p>
     <input class="nombre sala" id="inputSala" maxlength="10" placeholder="Código de la sala" autocomplete="off">
-    <p class="ayudaSala" id="ayudaSala">Si el código ya existe, entras a esa sala. Si no, la creas tú.</p>
-    <button class="jugar multi" id="btnCrear">Crear sala</button>
+    <p class="ayudaSala" id="ayudaSala">Si alguien ya creó esa sala, entras con ellos. Si no, la sala la creas tú y esperas.</p>
+    <button class="jugar multi" id="btnCrear">Entrar a la sala</button>
     <button class="salir" id="btnVolverMulti">Volver</button>
   </div>
 </section>
@@ -386,6 +398,8 @@ body{
     <p class="cupo"><span id="cupo">1</span><small id="cupoTexto">de 8 en el cielo</small></p>
     <ol class="espera" id="listaEspera"></ol>
     <p class="estadoSala" id="estadoSala">Esperando a que llegue el resto…</p>
+    <p class="compartir">Para que entren tus compañeros, pásales este link:<br><code id="linkSala"></code></p>
+    <button class="salir" id="btnCopiar">Copiar el link</button>
     <button class="jugar" id="btnPartir">Partir ahora</button>
     <button class="salir" id="btnSalirSala">Salir de la sala</button>
   </div>
@@ -674,6 +688,8 @@ async function entrarSala() {
   sala.cuenta = 0;
   sala.esperando.clear();
   $('tituloSala').textContent = 'Sala ' + codigo;
+  $('linkSala').textContent = location.origin + location.pathname + '?sala=' + codigo;
+  $('btnCopiar').textContent = 'Copiar el link';
   $('estadoSala').classList.remove('contando');
   $('pantallaInicio').hidden = true;
   $('pantallaMulti').hidden = true;
@@ -2150,6 +2166,14 @@ $('btnMulti').addEventListener('click', () => {
   $('inputSala').focus({preventScroll:true});
 });
 $('btnCrear').addEventListener('click', entrarSala);
+$('btnCopiar').addEventListener('click', async e => {
+  try {
+    await navigator.clipboard.writeText($('linkSala').textContent);
+    e.currentTarget.textContent = '¡Link copiado!';
+  } catch (err) {
+    e.currentTarget.textContent = 'Copia el link de arriba a mano';
+  }
+});
 $('btnVolverMulti').addEventListener('click', () => {
   $('pantallaMulti').hidden = true;
   $('pantallaInicio').hidden = false;
@@ -2163,6 +2187,15 @@ $('btnSalirSala').addEventListener('click', () => salirSala(false));
 $('btnOtra').addEventListener('click', volverAlInicio);
 $('inputNombre').value = leer('volantin:ultimoNombre') || '';
 $('inputSala').value = leer('volantin:sala') || '';
+
+/* Si llegaste por un link con ?sala=CODIGO, queda listo para entrar */
+const invitado = (new URLSearchParams(location.search).get('sala') || '')
+  .toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10);
+if (invitado) {
+  $('inputSala').value = invitado;
+  $('invitacion').textContent = `Te invitaron a la sala ${invitado}: escribe tu nombre y toca Multijugador online`;
+  $('invitacion').hidden = false;
+}
 $('inputNombre').focus({preventScroll:true});
 pintarHilos();
 dibujar();
