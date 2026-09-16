@@ -86,11 +86,16 @@ body{
 .nota{font-size:12px;color:#b3a3c4;margin:10px 0 0}
 
 .mandos{
-  position:fixed;z-index:6;display:flex;flex-direction:column;gap:12px;
-  right:calc(14px + env(safe-area-inset-right,0px));
+  position:fixed;z-index:6;left:0;right:0;
   bottom:calc(14px + env(safe-area-inset-bottom,0px));
+  padding-left:calc(14px + env(safe-area-inset-left,0px));
+  padding-right:calc(14px + env(safe-area-inset-right,0px));
+  display:flex;justify-content:space-between;align-items:flex-end;
+  pointer-events:none;   /* solo los botones reciben el toque */
 }
 .mandos[hidden]{display:none}
+.grupo{display:flex;gap:12px;pointer-events:auto}
+.grupo.altura{flex-direction:column}
 .mando{
   width:68px;height:68px;border-radius:50%;
   background:rgba(24,12,40,.5);border:2.5px solid rgba(255,244,224,.4);
@@ -224,8 +229,14 @@ body{
 </div>
 
 <div class="mandos" id="mandos" hidden>
-  <button class="mando" data-dir="sube" aria-label="Subir el volantín">▲</button>
-  <button class="mando" data-dir="baja" aria-label="Bajar el volantín">▼</button>
+  <div class="grupo lado">
+    <button class="mando" data-dir="izq" aria-label="Mover a la izquierda">◀</button>
+    <button class="mando" data-dir="der" aria-label="Mover a la derecha">▶</button>
+  </div>
+  <div class="grupo altura">
+    <button class="mando" data-dir="sube" aria-label="Subir el volantín">▲</button>
+    <button class="mando" data-dir="baja" aria-label="Bajar el volantín">▼</button>
+  </div>
 </div>
 
 <div class="grito" id="grito"></div>
@@ -275,7 +286,7 @@ body{
 
     <input class="nombre" id="inputNombre" maxlength="14" placeholder="Tu nombre" autocomplete="off">
     <button class="jugar" id="btnJugar">Soltar el volantín</button>
-    <p class="pie">Mouse, flechas, o los botones ▲▼ en el celular. Dura 2 minutos, y los últimos 30 segundos se ponen feos.</p>
+    <p class="pie">Mouse, flechas, o los botones en pantalla si juegas en el celular. Dura 2 minutos, y los últimos 30 segundos se ponen feos.</p>
   </div>
 </section>
 
@@ -583,13 +594,14 @@ function nuevoJuego(nombre) {
 
 /* ---------- control ---------- */
 const teclas = {};
-let mandoSube = false, mandoBaja = false;
+const mando = {sube:false, baja:false, izq:false, der:false};
+const conMando = () => mando.sube || mando.baja || mando.izq || mando.der;
 const mandos = $('mandos');
 
 /* Con el dedo, el volantín vuela un poco más arriba del toque: si no, la mano
    tapa justo lo que hay que mirar. */
 function apuntar(e) {
-  if (!j || j.terminado || mandoSube || mandoBaja) return;
+  if (!j || j.terminado || conMando()) return;
   if (e.target && e.target.closest && e.target.closest('.mandos')) return;
   j.meta.x = e.clientX;
   j.meta.y = e.clientY - (e.pointerType === 'touch' ? 68 * S : 0);
@@ -603,9 +615,9 @@ if (window.matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints >
 window.addEventListener('touchstart', mostrarMandos, {once:true, passive:true});
 
 mandos.querySelectorAll('.mando').forEach(boton => {
-  const sube = boton.dataset.dir === 'sube';
+  const dir = boton.dataset.dir;
   const marcar = apretado => {
-    if (sube) mandoSube = apretado; else mandoBaja = apretado;
+    mando[dir] = apretado;
     boton.classList.toggle('apretado', apretado);
   };
   boton.addEventListener('pointerdown', e => {
@@ -617,7 +629,7 @@ mandos.querySelectorAll('.mando').forEach(boton => {
     boton.addEventListener(evento, () => marcar(false)));
 });
 window.addEventListener('blur', () => {
-  mandoSube = mandoBaja = false;
+  for (const d in mando) mando[d] = false;
   mandos.querySelectorAll('.mando').forEach(b => b.classList.remove('apretado'));
 });
 window.addEventListener('keydown', e => {
@@ -832,10 +844,10 @@ function actualizar(dt) {
     : `viento: ${vv < 0 ? 'sube' : 'baja'} ${Math.abs(vv) > 38 ? flecha + flecha : flecha}`;
 
   /* volantín */
-  if (teclas.ArrowUp || teclas.w || mandoSube)   j.meta.y -= 620 * dt;
-  if (teclas.ArrowDown || teclas.s || mandoBaja) j.meta.y += 620 * dt;
-  if (teclas.ArrowLeft || teclas.a)  j.meta.x -= 620 * dt;
-  if (teclas.ArrowRight || teclas.d) j.meta.x += 620 * dt;
+  if (teclas.ArrowUp || teclas.w || mando.sube)    j.meta.y -= 620 * dt;
+  if (teclas.ArrowDown || teclas.s || mando.baja)  j.meta.y += 620 * dt;
+  if (teclas.ArrowLeft || teclas.a || mando.izq)   j.meta.x -= 620 * dt;
+  if (teclas.ArrowRight || teclas.d || mando.der)  j.meta.x += 620 * dt;
   j.meta.x = lim(j.meta.x, 40 * S, W * .72);
   j.meta.y = lim(j.meta.y, 34 * S, suelo - 16 * S);
 
