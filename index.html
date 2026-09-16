@@ -109,6 +109,47 @@ body{
 }
 @media (max-height:420px){ .mando{width:58px;height:58px;font-size:22px} }
 
+.bloque{
+  background:rgba(255,244,224,.05);border-radius:12px;padding:12px 14px;margin-top:12px;text-align:left
+}
+.bloque h4{
+  margin:0 0 9px;font-family:var(--display);font-size:11px;font-weight:400;color:#c3b2d6;
+  display:flex;align-items:center;justify-content:space-between
+}
+.mini{
+  background:none;border:1.5px solid rgba(255,244,224,.25);color:#d9c6ea;
+  border-radius:7px;width:26px;height:22px;cursor:pointer;font-size:12px;line-height:1
+}
+.mini:hover{border-color:var(--oro);color:var(--oro)}
+.salas{list-style:none;margin:0;padding:0;display:grid;gap:5px;max-height:148px;overflow-y:auto}
+.salas li{
+  display:flex;align-items:center;gap:8px;background:rgba(0,0,0,.28);
+  border-radius:9px;padding:7px 10px;font-size:13px
+}
+.salas li.vacio{justify-content:center;color:#9c8aa6;font-size:12px;background:none}
+.salas li span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.salas li em{font-style:normal;font-family:var(--display);font-size:11px;color:#d9c6ea}
+.salas li button{
+  background:var(--verde);border:none;border-radius:7px;color:#0d2a17;
+  font-family:var(--texto);font-weight:900;font-size:11.5px;padding:5px 11px;cursor:pointer
+}
+.tipos{display:flex;gap:8px;margin-top:8px}
+.tipo{
+  flex:1;background:rgba(0,0,0,.28);border:2px solid rgba(255,244,224,.2);color:#d9c6ea;
+  border-radius:9px;padding:9px;cursor:pointer;font-family:var(--texto);font-weight:900;font-size:12.5px
+}
+.tipo.activo{border-color:var(--oro);color:var(--oro);background:rgba(255,209,102,.12)}
+.nombre.chico{margin-top:0;font-size:14px;padding:10px 12px}
+.filaCodigo{display:flex;gap:8px}
+.filaCodigo .nombre{flex:1}
+.jugar.entrar{margin-top:0;width:auto;padding:0 18px;font-size:14px;background:var(--verde);box-shadow:0 5px 0 #2c6b41}
+.jugar.entrar:active{box-shadow:0 0 0 #2c6b41}
+.codigoSala{
+  margin:12px 0 0;font-family:var(--display);font-size:clamp(22px,6vw,32px);color:var(--oro);letter-spacing:6px
+}
+.codigoSala small{display:block;font-family:var(--texto);font-size:11.5px;color:#9c8aa6;letter-spacing:.5px;margin-top:4px}
+.codigoSala[hidden]{display:none}
+
 .nombre.sala{
   margin-top:0;font-family:var(--display);font-size:clamp(18px,4.5vw,24px);
   letter-spacing:3px;text-transform:uppercase
@@ -384,10 +425,31 @@ body{
 <section class="pantalla" id="pantallaMulti" hidden>
   <div class="tarjeta">
     <p class="rango">Multijugador</p>
-    <p class="bajada">Hasta 8 volantines en el mismo cielo. <b>Escribe el código que te dieron</b> para entrar a esa sala, o inventa uno y pásaselo a tu equipo.</p>
-    <input class="nombre sala" id="inputSala" maxlength="10" placeholder="Código de la sala" autocomplete="off">
-    <p class="ayudaSala" id="ayudaSala">Si alguien ya creó esa sala, entras con ellos. Si no, la sala la creas tú y esperas.</p>
-    <button class="jugar multi" id="btnCrear">Entrar a la sala</button>
+
+    <div class="bloque">
+      <h4>Salas abiertas <button class="mini" id="btnRefrescar" title="Actualizar">↻</button></h4>
+      <ol class="salas" id="listaSalas"><li class="vacio">Buscando salas…</li></ol>
+    </div>
+
+    <div class="bloque">
+      <h4>Crear una sala</h4>
+      <input class="nombre chico" id="inputNombreSala" maxlength="20" placeholder="Nombre: ej Marketing" autocomplete="off">
+      <div class="tipos">
+        <button class="tipo activo" data-tipo="publica">Pública</button>
+        <button class="tipo" data-tipo="privada">Privada</button>
+      </div>
+      <p class="ayudaSala" id="ayudaSala">Las públicas aparecen en la lista de arriba. Las privadas entregan un código de 6 dígitos que tú repartes.</p>
+      <button class="jugar multi" id="btnCrear">Crear sala</button>
+    </div>
+
+    <div class="bloque">
+      <h4>Entrar con un código</h4>
+      <div class="filaCodigo">
+        <input class="nombre sala" id="inputSala" maxlength="12" placeholder="CÓDIGO" autocomplete="off">
+        <button class="jugar entrar" id="btnEntrarCodigo">Entrar</button>
+      </div>
+    </div>
+
     <button class="salir" id="btnVolverMulti">Volver</button>
   </div>
 </section>
@@ -398,6 +460,7 @@ body{
     <p class="cupo"><span id="cupo">1</span><small id="cupoTexto">de 8 en el cielo</small></p>
     <ol class="espera" id="listaEspera"></ol>
     <p class="estadoSala" id="estadoSala">Esperando a que llegue el resto…</p>
+    <p class="codigoSala" id="codigoSala" hidden></p>
     <p class="compartir">Para que entren tus compañeros, pásales este link:<br><code id="linkSala"></code></p>
     <button class="salir" id="btnCopiar">Copiar el link</button>
     <button class="jugar" id="btnPartir">Partir ahora</button>
@@ -597,6 +660,55 @@ function pintarSala(ahora) {
   ).join('');
 }
 
+/* ---------- registro de salas en la base ---------- */
+const URL_SALAS = NUBE.url.replace('/puntajes', '/salas');
+const VIDA_SALA = 60;      // minutos antes de que la sala se borre sola
+const RECIENTE = 120000;   // una sala se considera viva si dio señales hace menos de 2 min
+
+async function listarSalas() {
+  const desde = new Date(Date.now() - RECIENTE).toISOString();
+  const r = await fetch(`${URL_SALAS}?select=codigo,nombre,jugadores&privada=eq.false&estado=eq.espera&jugadores=lt.${SALA_MAX}&vista=gt.${desde}&order=vista.desc&limit=12`,
+    {headers:cabeceras()});
+  if (!r.ok) throw new Error('no se pudo leer las salas');
+  return r.json();
+}
+
+/* la base solo deja borrar las que ya cumplieron su hora: limpieza de paso */
+function barrerSalasViejas() {
+  const limite = new Date(Date.now() - VIDA_SALA * 60000).toISOString();
+  fetch(`${URL_SALAS}?creada=lt.${limite}`, {method:'DELETE', headers:cabeceras()}).catch(() => {});
+}
+
+async function registrarSala(codigo, nombre, privada) {
+  const r = await fetch(URL_SALAS, {
+    method:'POST',
+    headers:cabeceras({Prefer:'return=minimal'}),
+    body:JSON.stringify({codigo, nombre, privada, jugadores:1, estado:'espera'}),
+  });
+  if (r.status === 409) return 'existía';
+  if (!r.ok) throw new Error('no se pudo crear la sala');
+  return 'creada';
+}
+
+async function buscarSala(codigo) {
+  const r = await fetch(`${URL_SALAS}?select=codigo,nombre,jugadores,estado,privada&codigo=eq.${encodeURIComponent(codigo)}`,
+    {headers:cabeceras()});
+  if (!r.ok) return null;
+  const filas = await r.json();
+  return filas[0] || null;
+}
+
+function refrescarSala(codigo, cuantos, estado) {
+  fetch(`${URL_SALAS}?codigo=eq.${encodeURIComponent(codigo)}`, {
+    method:'PATCH',
+    headers:cabeceras({Prefer:'return=minimal'}),
+    body:JSON.stringify({jugadores:cuantos, estado, vista:new Date().toISOString()}),
+  }).catch(() => {});
+}
+
+const codigoDeNombre = t => (t || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 12);
+const codigoPrivado = () => String(Math.floor(100000 + Math.random() * 900000));
+
 /* ---------- sala de espera: se parte cuando se llena, con cuenta regresiva ---------- */
 const sala = {
   activa:false, codigo:null, aviso:null, cuenta:0, reloj:null, esperando:new Map(),
@@ -650,6 +762,7 @@ function arrancarCuenta() {
     beep(sala.cuenta > 0 ? 660 : 1040, .12, 'triangle', .05);
     if (sala.cuenta <= 0) {
       clearInterval(sala.reloj);
+      if (anfitrion()) refrescarSala(sala.codigo, gente(), 'jugando');
       salirSala(true);
       arrancarRonda();
       return;
@@ -660,23 +773,106 @@ function arrancarCuenta() {
   sala.reloj = setInterval(tic, 1000);
 }
 
-async function entrarSala() {
-  const codigo = ($('inputSala').value || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10);
+let refrescoSalas = null;
+
+async function pintarSalas() {
+  const lista = $('listaSalas');
+  try {
+    const salas = await listarSalas();
+    if (!salas.length) {
+      lista.innerHTML = '<li class="vacio">No hay salas abiertas. Crea una tú.</li>';
+      return;
+    }
+    lista.innerHTML = salas.map(x => `
+      <li>
+        <span>${limpio(x.nombre)}</span>
+        <em>${x.jugadores}/${SALA_MAX}</em>
+        <button data-codigo="${limpio(x.codigo)}">Entrar</button>
+      </li>`).join('');
+  } catch (e) {
+    lista.innerHTML = '<li class="vacio">No se pudo leer la lista de salas.</li>';
+  }
+}
+
+function abrirMultijugador() {
+  if (window.__invitado) $('inputSala').value = window.__invitado;
+  guardar('volantin:ultimoNombre', ($('inputNombre').value || '').trim().slice(0, 14) || 'Anónimo');
   const ayuda = $('ayudaSala');
   ayuda.classList.remove('malo');
-  if (!codigo) {
-    ayuda.textContent = 'Escribe un código de sala para jugar con otros. El mismo que tus compañeros.';
+  ayuda.textContent = 'Las públicas aparecen en la lista de arriba. Las privadas entregan un código de 6 dígitos que tú repartes.';
+  $('pantallaInicio').hidden = true;
+  $('pantallaMulti').hidden = false;
+  barrerSalasViejas();
+  pintarSalas();
+  clearInterval(refrescoSalas);
+  refrescoSalas = setInterval(() => { if (!$('pantallaMulti').hidden) pintarSalas(); }, 5000);
+}
+
+function cerrarMultijugador() {
+  clearInterval(refrescoSalas);
+  refrescoSalas = null;
+  $('pantallaMulti').hidden = true;
+}
+
+/* crear: pública con el nombre que escribiste, o privada con 6 dígitos */
+async function crearSala() {
+  const ayuda = $('ayudaSala');
+  ayuda.classList.remove('malo');
+  const esPrivada = document.querySelector('.tipo.activo').dataset.tipo === 'privada';
+  const nombre = ($('inputNombreSala').value || '').trim().slice(0, 20)
+    || (esPrivada ? 'Sala privada' : 'Sala de ' + (($('inputNombre').value || 'alguien').trim() || 'alguien'));
+  let codigo = esPrivada ? codigoPrivado() : codigoDeNombre(nombre);
+  if (codigo.length < 3) codigo = codigoPrivado();
+
+  $('btnCrear').disabled = true;
+  ayuda.textContent = 'Creando la sala…';
+  try {
+    await registrarSala(codigo, nombre, esPrivada);
+    await entrarSala(codigo, esPrivada);
+  } catch (e) {
+    ayuda.textContent = 'No se pudo crear la sala. Revisa tu conexión.';
     ayuda.classList.add('malo');
-    $('inputSala').focus();
+  }
+  $('btnCrear').disabled = false;
+}
+
+/* entrar con un código escrito a mano o tocando una sala de la lista */
+async function entrarPorCodigo(codigoDado) {
+  const ayuda = $('ayudaSala');
+  ayuda.classList.remove('malo');
+  const codigo = codigoDeNombre(codigoDado || $('inputSala').value);
+  if (codigo.length < 3) {
+    ayuda.textContent = 'Escribe el código que te dieron.';
+    ayuda.classList.add('malo');
     return;
   }
+  ayuda.textContent = 'Buscando la sala ' + codigo + '…';
+  const fila = await buscarSala(codigo);
+  if (!fila) {
+    ayuda.textContent = `No existe ninguna sala con el código ${codigo}.`;
+    ayuda.classList.add('malo');
+    return;
+  }
+  if (fila.jugadores >= SALA_MAX) {
+    ayuda.textContent = `La sala ${codigo} está llena (${SALA_MAX} de ${SALA_MAX}).`;
+    ayuda.classList.add('malo');
+    return;
+  }
+  if (fila.estado === 'jugando') {
+    ayuda.textContent = `La sala ${codigo} ya está jugando. Espera la próxima ronda.`;
+    ayuda.classList.add('malo');
+    return;
+  }
+  await entrarSala(codigo, fila.privada);
+}
+
+async function entrarSala(codigo, esPrivada) {
+  const ayuda = $('ayudaSala');
+  ayuda.classList.remove('malo');
   guardar('volantin:sala', codigo);
-  guardar('volantin:ultimoNombre', ($('inputNombre').value || '').trim().slice(0, 14) || 'Anónimo');
   ayuda.textContent = 'Entrando a la sala ' + codigo + '…';
-  $('btnMulti').disabled = true;
   cerrarCielo();
   const entró = await abrirCielo(codigo);
-  $('btnMulti').disabled = false;
   if (!entró) {
     ayuda.textContent = 'No se pudo entrar a la sala. Revisa tu conexión o juega solo.';
     ayuda.classList.add('malo');
@@ -685,14 +881,17 @@ async function entrarSala() {
 
   sala.activa = true;
   sala.codigo = codigo;
+  sala.privada = !!esPrivada;
   sala.cuenta = 0;
   sala.esperando.clear();
-  $('tituloSala').textContent = 'Sala ' + codigo;
+  $('tituloSala').textContent = esPrivada ? 'Sala privada' : 'Sala ' + codigo;
+  $('codigoSala').hidden = false;
+  $('codigoSala').innerHTML = `${codigo}<small>${esPrivada ? 'código para entrar: repártelo a los tuyos' : 'código de la sala'}</small>`;
   $('linkSala').textContent = location.origin + location.pathname + '?sala=' + codigo;
   $('btnCopiar').textContent = 'Copiar el link';
   $('estadoSala').classList.remove('contando');
   $('pantallaInicio').hidden = true;
-  $('pantallaMulti').hidden = true;
+  cerrarMultijugador();
   $('pantallaSala').hidden = false;
   pintarEspera();
 
@@ -707,6 +906,10 @@ async function entrarSala() {
       if (ahora - v.visto > 4000) { sala.esperando.delete(id); cambió = true; }
     });
     if (cambió) pintarEspera();
+    if (anfitrion()) {
+      sala.pulso = (sala.pulso || 0) + 1;
+      if (sala.pulso % 6 === 0) refrescarSala(sala.codigo, gente(), 'espera');
+    }
     if (sala.cuenta <= 0 && gente() >= SALA_MAX && anfitrion()) { mandar({t:'ya'}); arrancarCuenta(); }
   }, 1000);
 }
@@ -718,7 +921,7 @@ function salirSala(siguiendo) {
   sala.esperando.clear();
   sala.cuenta = 0;
   $('pantallaSala').hidden = true;
-  $('pantallaMulti').hidden = true;
+  cerrarMultijugador();
   if (!siguiendo) {
     mandar({t:'chao', id:MI_ID});
     cerrarCielo();
@@ -1055,8 +1258,8 @@ window.addEventListener('blur', () => {
 window.addEventListener('keydown', e => {
   if (!$('pantallaSala').hidden) { if (e.key === 'Escape') salirSala(false); return; }
   if (!$('pantallaMulti').hidden) {
-    if (e.key === 'Enter') entrarSala();
-    if (e.key === 'Escape') { $('pantallaMulti').hidden = true; $('pantallaInicio').hidden = false; }
+    if (e.key === 'Enter') { document.activeElement === $('inputSala') ? entrarPorCodigo() : crearSala(); }
+    if (e.key === 'Escape') { cerrarMultijugador(); $('pantallaInicio').hidden = false; }
     return;
   }
   if (!$('pantallaInicio').hidden) { if (e.key === 'Enter') jugarSolo(); return; }
@@ -2155,17 +2358,21 @@ function volverAlInicio() {
 }
 
 $('btnJugar').addEventListener('click', jugarSolo);
-$('btnMulti').addEventListener('click', () => {
-  guardar('volantin:ultimoNombre', ($('inputNombre').value || '').trim().slice(0, 14) || 'Anónimo');
-  const ayuda = $('ayudaSala');
-  ayuda.classList.remove('malo');
-  ayuda.textContent = 'Si el código ya existe, entras a esa sala. Si no, la creas tú.';
-  if (!$('inputSala').value) $('inputSala').value = leer('volantin:sala') || 'FONDA';
-  $('pantallaInicio').hidden = true;
-  $('pantallaMulti').hidden = false;
-  $('inputSala').focus({preventScroll:true});
+$('btnMulti').addEventListener('click', abrirMultijugador);
+$('btnCrear').addEventListener('click', crearSala);
+$('btnRefrescar').addEventListener('click', () => { barrerSalasViejas(); pintarSalas(); });
+$('btnEntrarCodigo').addEventListener('click', () => entrarPorCodigo());
+$('listaSalas').addEventListener('click', e => {
+  const b = e.target.closest('button[data-codigo]');
+  if (b) entrarPorCodigo(b.dataset.codigo);
 });
-$('btnCrear').addEventListener('click', entrarSala);
+document.querySelectorAll('.tipo').forEach(t => t.addEventListener('click', () => {
+  document.querySelectorAll('.tipo').forEach(o => o.classList.toggle('activo', o === t));
+  $('ayudaSala').classList.remove('malo');
+  $('ayudaSala').textContent = t.dataset.tipo === 'privada'
+    ? 'Se genera un código de 6 dígitos. La sala no aparece en la lista: solo entra quien tenga el código.'
+    : 'Aparece en la lista de salas abiertas para que cualquiera del equipo entre.';
+}));
 $('btnCopiar').addEventListener('click', async e => {
   try {
     await navigator.clipboard.writeText($('linkSala').textContent);
@@ -2175,7 +2382,7 @@ $('btnCopiar').addEventListener('click', async e => {
   }
 });
 $('btnVolverMulti').addEventListener('click', () => {
-  $('pantallaMulti').hidden = true;
+  cerrarMultijugador();
   $('pantallaInicio').hidden = false;
 });
 $('btnPartir').addEventListener('click', () => {
@@ -2194,6 +2401,7 @@ const invitado = (new URLSearchParams(location.search).get('sala') || '')
 if (invitado) {
   $('inputSala').value = invitado;
   $('invitacion').textContent = `Te invitaron a la sala ${invitado}: escribe tu nombre y toca Multijugador online`;
+  window.__invitado = invitado;
   $('invitacion').hidden = false;
 }
 $('inputNombre').focus({preventScroll:true});
