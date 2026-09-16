@@ -85,6 +85,25 @@ body{
 .comodines span.malo{background:rgba(255,95,126,.14);border-color:rgba(255,95,126,.5)}
 .nota{font-size:12px;color:#b3a3c4;margin:10px 0 0}
 
+.mandos{
+  position:fixed;z-index:6;display:flex;flex-direction:column;gap:12px;
+  right:calc(14px + env(safe-area-inset-right,0px));
+  bottom:calc(14px + env(safe-area-inset-bottom,0px));
+}
+.mandos[hidden]{display:none}
+.mando{
+  width:68px;height:68px;border-radius:50%;
+  background:rgba(24,12,40,.5);border:2.5px solid rgba(255,244,224,.4);
+  color:var(--papel);font-size:26px;line-height:1;
+  display:grid;place-items:center;cursor:pointer;
+  touch-action:none;-webkit-user-select:none;user-select:none;
+  backdrop-filter:blur(6px);transition:transform .07s,background .07s,border-color .07s;
+}
+.mando.apretado{
+  background:rgba(255,209,102,.85);border-color:#fff4e0;color:#2a1a06;transform:scale(.92);
+}
+@media (max-height:420px){ .mando{width:58px;height:58px;font-size:22px} }
+
 .grito{
   position:fixed;top:32%;left:50%;transform:translate(-50%,-50%) scale(.6);
   font-family:var(--display);font-size:clamp(30px,8vw,64px);color:var(--oro);
@@ -204,6 +223,11 @@ body{
   </div>
 </div>
 
+<div class="mandos" id="mandos" hidden>
+  <button class="mando" data-dir="sube" aria-label="Subir el volantín">▲</button>
+  <button class="mando" data-dir="baja" aria-label="Bajar el volantín">▼</button>
+</div>
+
 <div class="grito" id="grito"></div>
 
 <section class="pantalla" id="pantallaInicio">
@@ -251,7 +275,7 @@ body{
 
     <input class="nombre" id="inputNombre" maxlength="14" placeholder="Tu nombre" autocomplete="off">
     <button class="jugar" id="btnJugar">Soltar el volantín</button>
-    <p class="pie">Mouse, dedo o flechas. Dura 2 minutos, y los últimos 30 segundos se ponen feos.</p>
+    <p class="pie">Mouse, flechas, o los botones ▲▼ en el celular. Dura 2 minutos, y los últimos 30 segundos se ponen feos.</p>
   </div>
 </section>
 
@@ -559,13 +583,42 @@ function nuevoJuego(nombre) {
 
 /* ---------- control ---------- */
 const teclas = {};
-window.addEventListener('pointermove', e => {
-  if (!j || j.terminado) return;
-  j.meta.x = e.clientX; j.meta.y = e.clientY;
+let mandoSube = false, mandoBaja = false;
+const mandos = $('mandos');
+
+/* Con el dedo, el volantín vuela un poco más arriba del toque: si no, la mano
+   tapa justo lo que hay que mirar. */
+function apuntar(e) {
+  if (!j || j.terminado || mandoSube || mandoBaja) return;
+  if (e.target && e.target.closest && e.target.closest('.mandos')) return;
+  j.meta.x = e.clientX;
+  j.meta.y = e.clientY - (e.pointerType === 'touch' ? 68 * S : 0);
+}
+window.addEventListener('pointermove', apuntar);
+cv.addEventListener('pointerdown', apuntar);
+
+/* Botones para celular: mantener apretado para subir o bajar */
+function mostrarMandos() { if (mandos.hidden) mandos.hidden = false; }
+if (window.matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0) mostrarMandos();
+window.addEventListener('touchstart', mostrarMandos, {once:true, passive:true});
+
+mandos.querySelectorAll('.mando').forEach(boton => {
+  const sube = boton.dataset.dir === 'sube';
+  const marcar = apretado => {
+    if (sube) mandoSube = apretado; else mandoBaja = apretado;
+    boton.classList.toggle('apretado', apretado);
+  };
+  boton.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    try { boton.setPointerCapture(e.pointerId); } catch (err) {}
+    marcar(true);
+  });
+  ['pointerup', 'pointercancel', 'pointerleave'].forEach(evento =>
+    boton.addEventListener(evento, () => marcar(false)));
 });
-cv.addEventListener('pointerdown', e => {
-  if (!j || j.terminado) return;
-  j.meta.x = e.clientX; j.meta.y = e.clientY;
+window.addEventListener('blur', () => {
+  mandoSube = mandoBaja = false;
+  mandos.querySelectorAll('.mando').forEach(b => b.classList.remove('apretado'));
 });
 window.addEventListener('keydown', e => {
   if (!$('pantallaInicio').hidden) { if (e.key === 'Enter') comenzar(); return; }
@@ -779,8 +832,8 @@ function actualizar(dt) {
     : `viento: ${vv < 0 ? 'sube' : 'baja'} ${Math.abs(vv) > 38 ? flecha + flecha : flecha}`;
 
   /* volantín */
-  if (teclas.ArrowUp || teclas.w)    j.meta.y -= 620 * dt;
-  if (teclas.ArrowDown || teclas.s)  j.meta.y += 620 * dt;
+  if (teclas.ArrowUp || teclas.w || mandoSube)   j.meta.y -= 620 * dt;
+  if (teclas.ArrowDown || teclas.s || mandoBaja) j.meta.y += 620 * dt;
   if (teclas.ArrowLeft || teclas.a)  j.meta.x -= 620 * dt;
   if (teclas.ArrowRight || teclas.d) j.meta.x += 620 * dt;
   j.meta.x = lim(j.meta.x, 40 * S, W * .72);
