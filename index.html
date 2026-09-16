@@ -109,11 +109,12 @@ body{
 }
 @media (max-height:420px){ .mando{width:58px;height:58px;font-size:22px} }
 
-.campos{display:flex;gap:8px;margin-top:14px}
-.campos .nombre{margin-top:0;min-width:0}
-.campos #inputNombre{flex:1 1 58%}
-.campos #inputSala{flex:1 1 42%}
-.nombre.sala{font-size:14px;letter-spacing:1px;text-transform:uppercase}
+.nombre.sala{
+  margin-top:0;font-family:var(--display);font-size:clamp(18px,4.5vw,24px);
+  letter-spacing:3px;text-transform:uppercase
+}
+.nombre.sala::placeholder{font-family:var(--texto);font-size:15px;letter-spacing:0;text-transform:none}
+#pantallaMulti .jugar.multi{margin-top:14px}
 .nombre.sala::placeholder{letter-spacing:0;text-transform:none}
 .ayudaSala{margin:8px 0 0;font-size:11.5px;color:#9c8aa6;line-height:1.4}
 .ayudaSala.malo{color:var(--rosa);font-weight:900}
@@ -259,7 +260,6 @@ body{
   .comodines span{font-size:11px;padding:3px 8px}
   .comodines span{font-size:11.5px;padding:4px 9px}
   .nota{margin-top:7px}
-  .campos{margin-top:10px}
   .nombre{padding:11px 14px}
   .ayudaSala{font-size:11px;margin-top:6px}
   .jugar{margin-top:9px;padding:13px;font-size:19px}
@@ -270,7 +270,6 @@ body{
   .ranking{margin-bottom:12px}
 }
 @media (max-width:560px){
-  .campos{flex-direction:column}
   .botones{flex-direction:column}
   .botones .jugar{font-size:17px}
   .placa{gap:12px;padding:7px 11px}
@@ -361,16 +360,23 @@ body{
     </div>
     <p class="nota">Los verdes te ayudan. Los rojos te complican la vida.</p>
 
-    <div class="campos">
-      <input class="nombre" id="inputNombre" maxlength="14" placeholder="Tu nombre" autocomplete="off">
-      <input class="nombre sala" id="inputSala" maxlength="10" placeholder="Sala: ej FONDA" autocomplete="off">
-    </div>
-    <p class="ayudaSala" id="ayudaSala">Para jugar con otros, escriban el mismo código de sala: la partida parte cuando se llenan los 8, o cuando alguien decide partir antes.</p>
+    <input class="nombre" id="inputNombre" maxlength="14" placeholder="Tu nombre" autocomplete="off">
     <div class="botones">
       <button class="jugar" id="btnJugar">Un jugador</button>
       <button class="jugar multi" id="btnMulti">Multijugador online</button>
     </div>
     <p class="pie">Mouse, flechas, o los botones en pantalla si juegas en el celular. Dura 2 minutos, y los últimos 30 segundos se ponen feos.</p>
+  </div>
+</section>
+
+<section class="pantalla" id="pantallaMulti" hidden>
+  <div class="tarjeta">
+    <p class="rango">Multijugador</p>
+    <p class="bajada">Vuelen juntos en el mismo cielo, hasta 8 en una sala. Inventa un código y pásaselo a tu equipo, o escribe el que te dieron.</p>
+    <input class="nombre sala" id="inputSala" maxlength="10" placeholder="Código de la sala" autocomplete="off">
+    <p class="ayudaSala" id="ayudaSala">Si el código ya existe, entras a esa sala. Si no, la creas tú.</p>
+    <button class="jugar multi" id="btnCrear">Crear sala</button>
+    <button class="salir" id="btnVolverMulti">Volver</button>
   </div>
 </section>
 
@@ -670,6 +676,7 @@ async function entrarSala() {
   $('tituloSala').textContent = 'Sala ' + codigo;
   $('estadoSala').classList.remove('contando');
   $('pantallaInicio').hidden = true;
+  $('pantallaMulti').hidden = true;
   $('pantallaSala').hidden = false;
   pintarEspera();
 
@@ -695,6 +702,7 @@ function salirSala(siguiendo) {
   sala.esperando.clear();
   sala.cuenta = 0;
   $('pantallaSala').hidden = true;
+  $('pantallaMulti').hidden = true;
   if (!siguiendo) {
     mandar({t:'chao', id:MI_ID});
     cerrarCielo();
@@ -1030,6 +1038,11 @@ window.addEventListener('blur', () => {
 });
 window.addEventListener('keydown', e => {
   if (!$('pantallaSala').hidden) { if (e.key === 'Escape') salirSala(false); return; }
+  if (!$('pantallaMulti').hidden) {
+    if (e.key === 'Enter') entrarSala();
+    if (e.key === 'Escape') { $('pantallaMulti').hidden = true; $('pantallaInicio').hidden = false; }
+    return;
+  }
   if (!$('pantallaInicio').hidden) { if (e.key === 'Enter') jugarSolo(); return; }
   if (!$('pantallaFinal').hidden) { if (e.key === 'Enter') volverAlInicio(); return; }
   teclas[e.key] = true;
@@ -1960,6 +1973,7 @@ function arrancarRonda() {
   for (let i = 0; i < 2; i++) nacerRamada(true);
   $('pantallaInicio').hidden = true;
   $('pantallaSala').hidden = true;
+  $('pantallaMulti').hidden = true;
   $('pantallaFinal').hidden = true;
   $('combo').classList.remove('activo');
   filtroActual = 'x'; aplicarFiltro();
@@ -1972,8 +1986,7 @@ function arrancarRonda() {
 /* un jugador: sin sala, sin esperar a nadie */
 function jugarSolo() {
   cerrarCielo();
-  $('ayudaSala').classList.remove('malo');
-  $('ayudaSala').textContent = 'Para jugar con otros, escribe un código de sala y usa el botón azul.';
+  $('pantallaMulti').hidden = true;
   arrancarRonda();
 }
 
@@ -2126,7 +2139,21 @@ function volverAlInicio() {
 }
 
 $('btnJugar').addEventListener('click', jugarSolo);
-$('btnMulti').addEventListener('click', entrarSala);
+$('btnMulti').addEventListener('click', () => {
+  guardar('volantin:ultimoNombre', ($('inputNombre').value || '').trim().slice(0, 14) || 'Anónimo');
+  const ayuda = $('ayudaSala');
+  ayuda.classList.remove('malo');
+  ayuda.textContent = 'Si el código ya existe, entras a esa sala. Si no, la creas tú.';
+  if (!$('inputSala').value) $('inputSala').value = leer('volantin:sala') || 'FONDA';
+  $('pantallaInicio').hidden = true;
+  $('pantallaMulti').hidden = false;
+  $('inputSala').focus({preventScroll:true});
+});
+$('btnCrear').addEventListener('click', entrarSala);
+$('btnVolverMulti').addEventListener('click', () => {
+  $('pantallaMulti').hidden = true;
+  $('pantallaInicio').hidden = false;
+});
 $('btnPartir').addEventListener('click', () => {
   if (sala.cuenta > 0 || gente() < 2) return;
   mandar({t:'ya'});
