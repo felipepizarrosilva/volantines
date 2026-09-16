@@ -1,0 +1,811 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Fonda Frenética</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bungee&family=Nunito:wght@700;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --noche:#221036;
+  --noche-2:#3b1442;
+  --madera:#7a4423;
+  --madera-osc:#4d2a14;
+  --madera-clara:#a4622f;
+  --papel:#fff4e0;
+  --rojo:#e0243c;
+  --azul:#1747a8;
+  --ampolleta:#ffc53d;
+  --verde:#4caf6d;
+  --display:"Bungee","Arial Black",system-ui,sans-serif;
+  --texto:"Nunito","Trebuchet MS",system-ui,sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;
+  font-family:var(--texto);
+  font-weight:700;
+  color:var(--papel);
+  background:radial-gradient(120% 90% at 50% 0%, var(--noche-2) 0%, var(--noche) 55%, #150a24 100%);
+  overflow:hidden;
+  -webkit-tap-highlight-color:transparent;
+  user-select:none;
+}
+
+/* ---------- guirnalda y ampolletas ---------- */
+.guirnalda{position:fixed;inset:0 0 auto 0;height:54px;z-index:5;pointer-events:none;overflow:hidden}
+.guirnalda .cuerda{position:absolute;top:10px;left:-2%;width:104%;height:24px;border-bottom:3px solid #5b3a1e;border-radius:0 0 50% 50%/0 0 22px 22px}
+.banderines{display:flex;justify-content:center;gap:2px;padding-top:6px}
+.banderin{width:26px;height:30px;clip-path:polygon(0 0,100% 0,50% 100%);transform-origin:top center;animation:flamear 3.2s ease-in-out infinite}
+@keyframes flamear{0%,100%{transform:rotate(-3deg)}50%{transform:rotate(3deg)}}
+
+.ampolletas{position:fixed;top:44px;left:0;right:0;display:flex;justify-content:space-around;z-index:4;pointer-events:none}
+.bulb{width:12px;height:16px;border-radius:0 0 50% 50%/0 0 60% 60%;background:var(--ampolleta);
+  box-shadow:0 0 18px 6px rgba(255,197,61,.35), 0 0 46px 14px rgba(255,140,40,.14);
+  animation:titilar 4s ease-in-out infinite}
+@keyframes titilar{0%,100%{opacity:1}45%{opacity:.62}}
+
+/* ---------- estructura ---------- */
+#app{height:100%;display:flex;flex-direction:column;padding:62px 16px 14px;gap:12px;max-width:1080px;margin:0 auto}
+
+/* HUD: pizarra de menú */
+.pizarra{
+  display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:14px;
+  background:linear-gradient(#2b2219,#211a13);
+  border:5px solid var(--madera);border-radius:10px;
+  padding:10px 16px;
+  box-shadow:0 8px 0 rgba(0,0,0,.35), inset 0 0 40px rgba(0,0,0,.5);
+}
+.marcador{display:flex;gap:22px;align-items:baseline}
+.dato{display:flex;flex-direction:column;line-height:1}
+.dato b{font-family:var(--display);font-size:clamp(20px,3.4vw,30px);color:var(--papel);letter-spacing:.5px}
+.dato span{font-size:11px;font-weight:900;color:#b7a68c;margin-top:4px}
+.dato.alerta b{color:var(--rojo)}
+.combo{font-family:var(--display);font-size:clamp(18px,3vw,26px);color:var(--ampolleta);text-align:center;transition:transform .12s}
+.combo.pop{transform:scale(1.35)}
+.combo small{display:block;font-family:var(--texto);font-size:11px;color:#b7a68c;letter-spacing:.5px}
+.icon-btn{background:none;border:2px solid #5b4a33;color:var(--papel);border-radius:8px;font-size:17px;width:40px;height:40px;cursor:pointer;transition:border-color .15s}
+.icon-btn:hover{border-color:var(--ampolleta)}
+
+/* aviso hora del terremoto */
+.aviso{
+  position:fixed;top:64px;left:50%;transform:translate(-50%,-400%);
+  background:var(--rojo);color:#fff;font-family:var(--display);font-size:15px;
+  padding:8px 22px;border-radius:0 0 12px 12px;z-index:8;
+  box-shadow:0 6px 24px rgba(224,36,60,.5);transition:transform .4s cubic-bezier(.2,1.4,.4,1)
+}
+.aviso.visible{transform:translate(-50%,0)}
+
+/* mesón con clientes */
+.meson{flex:1;min-height:0;display:flex;flex-direction:column;justify-content:flex-end;position:relative}
+.meson::before{
+  content:"";position:absolute;left:50%;bottom:-14px;transform:translateX(-50%);
+  width:min(980px,104%);height:78%;pointer-events:none;
+  background:radial-gradient(62% 78% at 50% 100%, rgba(255,197,61,.17), rgba(255,140,40,.05) 55%, transparent 72%)
+}
+.clientes{position:relative}
+.clientes{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;align-items:end}
+.puesto{min-height:190px;display:flex;align-items:flex-end}
+
+.cliente{
+  width:100%;background:var(--papel);color:#3a2412;border-radius:12px;padding:12px 10px 10px;
+  box-shadow:0 10px 0 rgba(0,0,0,.28);cursor:pointer;position:relative;
+  animation:llegar .32s cubic-bezier(.2,1.3,.4,1);text-align:center
+}
+@keyframes llegar{from{transform:translateY(26px) scale(.9);opacity:0}to{transform:none;opacity:1}}
+.cliente:hover{outline:3px solid var(--ampolleta);outline-offset:2px}
+.cliente.correcto{animation:feliz .4s ease}
+@keyframes feliz{0%{transform:none}30%{transform:translateY(-14px) scale(1.06)}100%{transform:none}}
+.cliente.error{animation:enojo .3s ease}
+@keyframes enojo{0%,100%{transform:none}25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
+.cliente.se-va{animation:irse .3s ease forwards}
+@keyframes irse{to{transform:translateY(30px) rotate(6deg);opacity:0}}
+
+.cara{font-size:38px;line-height:1;filter:drop-shadow(0 2px 0 rgba(0,0,0,.15))}
+.pedido{display:flex;justify-content:center;flex-wrap:wrap;gap:5px;margin:8px 0 10px;min-height:38px}
+.chip{
+  width:38px;height:38px;display:grid;place-items:center;font-size:21px;
+  background:#f0e2c6;border:2px dashed #b99a68;border-radius:9px;transition:.15s
+}
+.chip.listo{background:var(--verde);border:2px solid #2f7a48;border-style:solid;transform:scale(.92)}
+.paciencia{height:9px;background:#e0cba6;border-radius:5px;overflow:hidden}
+.paciencia i{display:block;height:100%;width:100%;background:var(--verde);transition:background .3s}
+.tecla{
+  position:absolute;top:-11px;left:50%;transform:translateX(-50%);
+  background:var(--madera-osc);color:var(--papel);font-family:var(--display);font-size:11px;
+  padding:3px 9px;border-radius:6px;border:2px solid var(--madera-clara)
+}
+
+/* cocina */
+.cocina{
+  background:linear-gradient(var(--madera-clara),var(--madera) 18%,var(--madera-osc));
+  border-radius:14px 14px 10px 10px;padding:12px;
+  box-shadow:0 -6px 0 rgba(0,0,0,.25), inset 0 3px 0 rgba(255,255,255,.14);
+}
+.bandeja{
+  display:flex;align-items:center;gap:10px;background:rgba(0,0,0,.28);
+  border-radius:10px;padding:8px 10px;margin-bottom:10px
+}
+.bandeja .rotulo{font-family:var(--display);font-size:12px;color:#e8c9a4;white-space:nowrap}
+.ranuras{display:flex;gap:6px;flex:1}
+.ranura{
+  width:44px;height:44px;border-radius:9px;border:2px dashed rgba(255,244,224,.28);
+  display:grid;place-items:center;font-size:24px
+}
+.ranura.llena{border-style:solid;background:var(--papel);border-color:var(--papel);animation:plop .2s ease}
+@keyframes plop{from{transform:scale(.5)}to{transform:scale(1)}}
+.limpiar{
+  background:none;border:2px solid rgba(255,244,224,.3);color:var(--papel);
+  border-radius:9px;padding:8px 12px;font-family:var(--texto);font-weight:900;font-size:12px;cursor:pointer
+}
+.limpiar:hover{border-color:var(--rojo);color:var(--rojo)}
+
+.estaciones{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.estacion{
+  position:relative;border:none;border-radius:11px;padding:10px 4px 8px;cursor:pointer;
+  background:var(--papel);color:#3a2412;font-family:var(--texto);font-weight:900;
+  box-shadow:0 5px 0 rgba(0,0,0,.4);transition:transform .07s, box-shadow .07s
+}
+.estacion:active,.estacion.pulsada{transform:translateY(5px);box-shadow:0 0 0 rgba(0,0,0,.4)}
+.estacion em{display:block;font-size:30px;font-style:normal;line-height:1}
+.estacion span{display:block;font-size:11.5px;margin-top:5px}
+.estacion b{
+  position:absolute;top:5px;right:6px;font-family:var(--display);font-size:10px;
+  color:#8a6a45;background:#eadcc0;border-radius:5px;padding:1px 5px
+}
+
+/* puntos flotantes */
+.flota{position:fixed;font-family:var(--display);font-size:22px;pointer-events:none;z-index:9;animation:subir .9s ease-out forwards}
+@keyframes subir{to{transform:translate(-50%,-70px);opacity:0}}
+
+/* pantallas */
+.pantalla{
+  position:fixed;inset:0;z-index:20;display:grid;place-items:center;padding:24px;
+  background:rgba(18,8,32,.93);backdrop-filter:blur(4px);overflow-y:auto
+}
+.pantalla[hidden]{display:none}
+.tarjeta{width:min(520px,100%);text-align:center}
+.titulo{
+  font-family:var(--display);line-height:.92;margin:0;
+  font-size:clamp(46px,12vw,86px);color:var(--ampolleta);
+  text-shadow:0 5px 0 var(--rojo), 0 10px 0 var(--azul), 0 14px 30px rgba(0,0,0,.6)
+}
+.bajada{color:#d9c6ae;font-size:15px;margin:16px auto 22px;max-width:44ch;line-height:1.55;font-weight:700}
+.reglas{
+  display:grid;gap:8px;text-align:left;background:rgba(255,244,224,.07);
+  border-left:4px solid var(--ampolleta);border-radius:0 10px 10px 0;padding:14px 16px;margin-bottom:22px
+}
+.reglas p{margin:0;font-size:13.5px;color:#e8dbc7;line-height:1.45}
+.reglas p em{font-style:normal;color:var(--ampolleta)}
+.nombre{
+  width:100%;padding:13px 16px;border-radius:10px;border:3px solid var(--madera-clara);
+  background:rgba(0,0,0,.35);color:var(--papel);font-family:var(--texto);font-weight:900;font-size:16px;text-align:center
+}
+.nombre:focus{outline:none;border-color:var(--ampolleta)}
+.jugar{
+  width:100%;margin-top:12px;padding:16px;border:none;border-radius:12px;cursor:pointer;
+  background:var(--rojo);color:#fff;font-family:var(--display);font-size:22px;
+  box-shadow:0 7px 0 #8d0f22;transition:transform .07s,box-shadow .07s
+}
+.jugar:active{transform:translateY(7px);box-shadow:0 0 0 #8d0f22}
+.pie{margin-top:16px;font-size:12px;color:#8f7d97}
+
+.rango{font-family:var(--display);font-size:clamp(24px,6vw,36px);color:var(--ampolleta);margin:0 0 6px}
+.final{font-family:var(--display);font-size:clamp(52px,14vw,80px);color:var(--papel);margin:0;line-height:1}
+.final small{display:block;font-family:var(--texto);font-size:12px;color:#9c8aa6;letter-spacing:1px;margin-top:4px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:20px 0}
+.stats div{background:rgba(255,244,224,.07);border-radius:10px;padding:10px 6px}
+.stats b{display:block;font-family:var(--display);font-size:20px;color:var(--ampolleta)}
+.stats span{font-size:10.5px;color:#a89684}
+.ranking{text-align:left;margin-bottom:18px}
+.ranking h3{font-family:var(--display);font-size:14px;color:#d9c6ae;margin:0 0 8px;font-weight:400}
+.ranking ol{list-style:none;margin:0;padding:0;display:grid;gap:4px;counter-reset:pos}
+.ranking li{
+  counter-increment:pos;display:flex;justify-content:space-between;gap:10px;
+  padding:8px 12px;border-radius:8px;background:rgba(255,244,224,.06);font-size:13.5px
+}
+.ranking li::before{content:counter(pos) ".";color:#8f7d97;margin-right:auto;padding-right:8px}
+.ranking li span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ranking li.yo{background:var(--ampolleta);color:#2a1a06}
+.ranking li.yo::before{color:#7a5a12}
+.ranking li b{font-family:var(--display);font-size:13px}
+
+@media (max-width:720px){
+  #app{padding:58px 10px 10px}
+  .clientes{grid-template-columns:repeat(2,1fr)}
+  .puesto{min-height:0}
+  .estaciones{grid-template-columns:repeat(3,1fr)}
+  .marcador{gap:14px}
+  .bandeja .rotulo{display:none}
+  .ranura{width:38px;height:38px;font-size:20px}
+}
+@media (prefers-reduced-motion:reduce){
+  *{animation-duration:.01ms !important;transition-duration:.01ms !important}
+}
+</style>
+</head>
+<body>
+
+<div class="guirnalda" aria-hidden="true">
+  <div class="cuerda"></div>
+  <div class="banderines" id="banderines"></div>
+</div>
+<div class="ampolletas" id="ampolletas" aria-hidden="true"></div>
+
+<div id="app">
+  <header class="pizarra">
+    <div class="marcador">
+      <div class="dato" id="datoTiempo"><b id="tiempo">2:00</b><span>TIEMPO</span></div>
+      <div class="dato"><b id="puntaje">0</b><span>PUNTOS</span></div>
+    </div>
+    <div class="combo" id="combo">&nbsp;<small>&nbsp;</small></div>
+    <button class="icon-btn" id="btnSonido" title="Sonido" aria-label="Activar o silenciar sonido">🔊</button>
+  </header>
+
+  <main class="meson">
+    <div class="clientes" id="clientes"></div>
+  </main>
+
+  <footer class="cocina">
+    <div class="bandeja">
+      <div class="rotulo">BANDEJA</div>
+      <div class="ranuras" id="ranuras"></div>
+      <button class="limpiar" id="btnLimpiar">Botar todo</button>
+    </div>
+    <div class="estaciones" id="estaciones"></div>
+  </footer>
+</div>
+
+<div class="aviso" id="aviso">🍹 ¡HORA DEL TERREMOTO! PUNTOS X2</div>
+
+<section class="pantalla" id="pantallaInicio">
+  <div class="tarjeta">
+    <h1 class="titulo">Fonda<br>Frenética</h1>
+    <p class="bajada">Llegó el 18 y la ramada está repleta. Arma cada pedido antes de que se les acabe la paciencia.</p>
+    <div class="reglas">
+      <p><em>1.</em> Toca las estaciones (o teclas <em>1–5</em>) para poner comida en la bandeja.</p>
+      <p><em>2.</em> Toca al cliente (o teclas <em>Q W E R</em>) para servirle.</p>
+      <p><em>3.</em> Mientras más rápido sirves, más propina. Encadena pedidos para multiplicar.</p>
+    </div>
+    <input class="nombre" id="inputNombre" maxlength="14" placeholder="Tu nombre" autocomplete="off">
+    <button class="jugar" id="btnJugar">Abrir la fonda</button>
+    <p class="pie">Una ronda dura 2 minutos.</p>
+  </div>
+</section>
+
+<section class="pantalla" id="pantallaFinal" hidden>
+  <div class="tarjeta">
+    <p class="rango" id="rango"></p>
+    <p class="final"><span id="puntajeFinal">0</span><small>PUNTOS</small></p>
+    <div class="stats">
+      <div><b id="statAtendidos">0</b><span>ATENDIDOS</span></div>
+      <div><b id="statCombo">0</b><span>MEJOR COMBO</span></div>
+      <div><b id="statEnojados">0</b><span>SE FUERON</span></div>
+    </div>
+    <div class="ranking">
+      <h3>Mejores fonderos</h3>
+      <ol id="listaRanking"></ol>
+    </div>
+    <button class="jugar" id="btnOtra">Otra ronda</button>
+    <p class="pie">Pasa el teclado al siguiente.</p>
+  </div>
+</section>
+
+<script>
+(() => {
+'use strict';
+
+const MENU = [
+  {id:'emp', nombre:'Empanada',  emoji:'🥟', tecla:'1'},
+  {id:'ant', nombre:'Anticucho', emoji:'🍢', tecla:'2'},
+  {id:'cho', nombre:'Choripán',  emoji:'🌭', tecla:'3'},
+  {id:'ter', nombre:'Terremoto', emoji:'🍹', tecla:'4'},
+  {id:'mot', nombre:'Mote',      emoji:'🥤', tecla:'5'},
+];
+const CARAS = ['🤠','🧔','👩','👵','🧑‍🎤','👧','👨‍🌾','👩‍🦰','🧓','👦'];
+const TECLAS_PUESTO = ['Q','W','E','R'];
+const DURACION = 120;
+const HORA_TERREMOTO = 20;   // últimos segundos con puntaje doble
+const PUESTOS = 4;
+const CUPO_BANDEJA = 4;
+
+const $ = id => document.getElementById(id);
+const guardar = (k, v) => { try { localStorage.setItem(k, v); } catch (e) { /* sin storage */ } };
+const leer = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
+const el = {
+  clientes:$('clientes'), ranuras:$('ranuras'), estaciones:$('estaciones'),
+  tiempo:$('tiempo'), datoTiempo:$('datoTiempo'), puntaje:$('puntaje'), combo:$('combo'),
+  aviso:$('aviso'), inicio:$('pantallaInicio'), final:$('pantallaFinal'),
+};
+
+/* ---------- decoración ---------- */
+(() => {
+  const colores = ['#e0243c','#fff4e0','#1747a8'];
+  let flags = '';
+  for (let i = 0; i < 40; i++) flags += `<i class="banderin" style="background:${colores[i%3]};animation-delay:${(i%7)*.18}s"></i>`;
+  $('banderines').innerHTML = flags;
+  let bulbs = '';
+  for (let i = 0; i < 14; i++) bulbs += `<i class="bulb" style="animation-delay:${(i*.37).toFixed(2)}s"></i>`;
+  $('ampolletas').innerHTML = bulbs;
+})();
+
+/* ---------- sonido ---------- */
+let audioCtx = null, sonidoActivo = true;
+function ctxAudio() {
+  try {
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    return audioCtx;
+  } catch (e) { return null; }
+}
+function beep(freq, dur, tipo = 'square', vol = .05) {
+  const c = ctxAudio();
+  if (!c || !sonidoActivo) return;
+  const osc = c.createOscillator(), gain = c.createGain();
+  osc.type = tipo; osc.frequency.value = freq;
+  gain.gain.setValueAtTime(vol, c.currentTime);
+  gain.gain.exponentialRampToValueAtTime(.0001, c.currentTime + dur);
+  osc.connect(gain); gain.connect(c.destination);
+  osc.start(); osc.stop(c.currentTime + dur);
+}
+const sfx = {
+  tomar:  () => beep(520, .07, 'square', .04),
+  servir: () => { beep(660, .09); setTimeout(() => beep(880, .12), 70); setTimeout(() => beep(1180, .16), 150); },
+  error:  () => beep(150, .22, 'sawtooth', .05),
+  enojo:  () => { beep(300, .12, 'sawtooth', .05); setTimeout(() => beep(190, .2, 'sawtooth', .05), 110); },
+  fin:    () => [523, 659, 784, 1046].forEach((f, i) => setTimeout(() => beep(f, .25, 'triangle', .05), i * 130)),
+};
+
+/* ---------- cueca sintetizada ----------
+   6/8 en la melodía contra 3/4 en el rasgueo: esa sesquiáltera es lo que
+   hace que suene a cueca y no a vals. Guitarra, bajo y palmas, en La mayor. */
+const LA   = {bajo:[45, 52], voz:[57, 61, 64]};
+const MI7  = {bajo:[40, 47], voz:[56, 59, 64]};
+const RE   = {bajo:[38, 45], voz:[57, 62, 66]};
+const VUELTA = [LA, LA, MI7, MI7, RE, LA, MI7, LA];
+const MELODIA = [
+  [69,  0,  0, 73,  0,  0],
+  [76,  0, 74, 73,  0, 71],
+  [71,  0,  0, 68,  0, 71],
+  [73,  0, 71,  0, 68,  0],
+  [74,  0, 78,  0, 76, 74],
+  [73,  0, 69,  0, 73,  0],
+  [71,  0, 68,  0, 71, 73],
+  [69,  0,  0,  0, 76,  0],
+];
+const ACENTO = [1, .34, .82, .46, .82, .34];   // fuerte en 1, 3 y 5: el 3/4 de la guitarra
+const hz = midi => 440 * Math.pow(2, (midi - 69) / 12);
+
+let ruido = null;
+function bufferRuido(c) {
+  if (ruido) return ruido;
+  ruido = c.createBuffer(1, c.sampleRate * .2, c.sampleRate);
+  const d = ruido.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length);
+  return ruido;
+}
+
+const musica = {
+  master:null, corchea:.17, paso:0, proxima:0, timer:null,
+
+  encender() {
+    const c = ctxAudio();
+    if (!c || this.timer) return;
+    this.master = c.createGain();
+    this.master.gain.value = sonidoActivo ? .9 : 0;
+    this.master.connect(c.destination);
+    this.corchea = .17;
+    this.paso = 0;
+    this.proxima = c.currentTime + .15;
+    this.timer = setInterval(() => this.planificar(), 25);
+  },
+
+  apagar() {
+    clearInterval(this.timer);
+    this.timer = null;
+    if (this.master) { try { this.master.disconnect(); } catch (e) {} this.master = null; }
+  },
+
+  volumen() { if (this.master) this.master.gain.value = sonidoActivo ? .9 : 0; },
+
+  planificar() {
+    const c = ctxAudio();
+    if (!c) return this.apagar();
+    while (this.proxima < c.currentTime + .18) {
+      this.tocar(this.paso, this.proxima);
+      this.proxima += this.corchea;
+      this.paso = (this.paso + 1) % 48;
+    }
+  },
+
+  cuerda(freq, t, dur, vol, tipo = 'sawtooth', corte = 2400) {
+    const c = ctxAudio();
+    if (!c || !this.master) return;
+    const osc = c.createOscillator(), g = c.createGain(), f = c.createBiquadFilter();
+    osc.type = tipo; osc.frequency.value = freq;
+    f.type = 'lowpass'; f.frequency.value = corte;
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(vol, t + .008);
+    g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+    osc.connect(f); f.connect(g); g.connect(this.master);
+    osc.start(t); osc.stop(t + dur + .02);
+  },
+
+  palma(t, vol) {
+    const c = ctxAudio();
+    if (!c || !this.master) return;
+    const src = c.createBufferSource(), g = c.createGain(), f = c.createBiquadFilter();
+    src.buffer = bufferRuido(c);
+    f.type = 'bandpass'; f.frequency.value = 1700; f.Q.value = .9;
+    g.gain.setValueAtTime(vol, t);
+    g.gain.exponentialRampToValueAtTime(.0001, t + .12);
+    src.connect(f); f.connect(g); g.connect(this.master);
+    src.start(t); src.stop(t + .2);
+  },
+
+  tocar(paso, t) {
+    const compas = Math.floor(paso / 6), i = paso % 6;
+    const acorde = VUELTA[compas];
+    if (i === 0 || i === 3) this.cuerda(hz(acorde.bajo[i === 0 ? 0 : 1]), t, .38, .17, 'triangle', 900);
+    acorde.voz.forEach((n, k) => this.cuerda(hz(n), t + k * .012, .26, .045 * ACENTO[i], 'sawtooth', 2100));
+    const m = MELODIA[compas][i];
+    if (m) this.cuerda(hz(m), t, .32, .1, 'triangle', 3200);
+    if (i % 2 === 0) this.palma(t, i === 0 ? .06 : .035);
+  },
+};
+
+/* Pista propia: si dejas un archivo llamado cueca.mp3 (o .m4a / .ogg) junto a este
+   HTML, el juego lo usa como música. Si no hay ninguno, suena la cueca sintetizada. */
+const CANDIDATAS = ['cueca.mp3', 'cueca.m4a', 'cueca.ogg'];
+const pista = new Audio();
+let hayPista = false;
+(function buscarPista(i) {
+  if (i >= CANDIDATAS.length) return;
+  const prueba = new Audio(CANDIDATAS[i]);
+  prueba.addEventListener('canplaythrough', () => {
+    hayPista = true;
+    pista.src = prueba.src;
+    pista.loop = true;
+    pista.volume = .42;
+  }, {once:true});
+  prueba.addEventListener('error', () => buscarPista(i + 1), {once:true});
+  prueba.load();
+})(0);
+
+function sonarCueca() {
+  if (hayPista) {
+    pista.currentTime = 0;
+    pista.playbackRate = 1;
+    pista.muted = !sonidoActivo;
+    pista.play().catch(() => musica.encender());
+  } else {
+    musica.encender();
+  }
+}
+function callarCueca() {
+  pista.pause();
+  musica.apagar();
+}
+function acelerarCueca() {
+  pista.playbackRate = 1.05;
+  musica.corchea = .147;
+}
+
+$('btnSonido').addEventListener('click', e => {
+  sonidoActivo = !sonidoActivo;
+  e.currentTarget.textContent = sonidoActivo ? '🔊' : '🔇';
+  musica.volumen();
+  pista.muted = !sonidoActivo;
+  if (sonidoActivo) sfx.tomar();
+});
+
+/* ---------- estado ---------- */
+let juego = null;
+
+function nuevoJuego(nombre) {
+  return {
+    nombre, restante:DURACION, puntaje:0, combo:0, mejorCombo:0,
+    atendidos:0, enojados:0, bandeja:[], puestos:new Array(PUESTOS).fill(null),
+    proximoCliente:0, ultimoTs:0, terminado:false, avisoDado:false,
+    listoDesde:performance.now() + 250,
+  };
+}
+
+/* ---------- construcción de la cocina ---------- */
+el.estaciones.innerHTML = MENU.map(p => `
+  <button class="estacion" data-id="${p.id}">
+    <b>${p.tecla}</b><em>${p.emoji}</em><span>${p.nombre}</span>
+  </button>`).join('');
+el.estaciones.addEventListener('click', e => {
+  const btn = e.target.closest('.estacion');
+  if (btn) tomarPlato(btn.dataset.id);
+});
+$('btnLimpiar').addEventListener('click', () => vaciarBandeja());
+
+el.clientes.innerHTML = Array.from({length:PUESTOS}, (_, i) => `<div class="puesto" data-slot="${i}"></div>`).join('');
+el.clientes.addEventListener('click', e => {
+  const puesto = e.target.closest('.puesto');
+  if (puesto) servir(Number(puesto.dataset.slot));
+});
+
+function pintarBandeja() {
+  let html = '';
+  for (let i = 0; i < CUPO_BANDEJA; i++) {
+    const id = juego ? juego.bandeja[i] : undefined;
+    const plato = MENU.find(p => p.id === id);
+    html += `<div class="ranura${plato ? ' llena' : ''}">${plato ? plato.emoji : ''}</div>`;
+  }
+  el.ranuras.innerHTML = html;
+}
+pintarBandeja();
+
+/* ---------- mecánica ---------- */
+function tomarPlato(id) {
+  if (!juego || juego.terminado || performance.now() < juego.listoDesde) return;
+  const btn = el.estaciones.querySelector(`[data-id="${id}"]`);
+  if (btn) { btn.classList.add('pulsada'); setTimeout(() => btn.classList.remove('pulsada'), 90); }
+  if (juego.bandeja.length >= CUPO_BANDEJA) { sfx.error(); return; }
+  juego.bandeja.push(id);
+  sfx.tomar();
+  pintarBandeja();
+  juego.puestos.forEach(c => c && pintarPedido(c));
+}
+
+function vaciarBandeja() {
+  if (!juego || juego.terminado || !juego.bandeja.length) return;
+  juego.bandeja = [];
+  pintarBandeja();
+  juego.puestos.forEach(c => c && pintarPedido(c));
+}
+
+function cuenta(lista) {
+  return lista.reduce((acc, id) => (acc[id] = (acc[id] || 0) + 1, acc), {});
+}
+function coincide(bandeja, pedido) {
+  if (bandeja.length !== pedido.length) return false;
+  const a = cuenta(bandeja), b = cuenta(pedido);
+  return Object.keys(b).every(k => a[k] === b[k]);
+}
+
+function crearCliente(slot) {
+  const avance = 1 - juego.restante / DURACION;
+  let min = 1, max = 2;
+  if (avance > .6)      { min = 2; max = 3; }
+  else if (avance > .25){ min = 1; max = 3; }
+  const largo = min + Math.floor(Math.random() * (max - min + 1));
+  const pedido = Array.from({length:largo}, () => MENU[Math.floor(Math.random() * MENU.length)].id);
+  const paciencia = (14 - 4 * avance) + 3.5 * largo;
+
+  const nodo = document.createElement('div');
+  nodo.className = 'cliente';
+  nodo.innerHTML = `
+    <div class="tecla">${TECLAS_PUESTO[slot]}</div>
+    <div class="cara">${CARAS[Math.floor(Math.random() * CARAS.length)]}</div>
+    <div class="pedido"></div>
+    <div class="paciencia"><i></i></div>`;
+
+  const cliente = {
+    slot, pedido, paciencia, maxPaciencia:paciencia, nodo,
+    barra:nodo.querySelector('.paciencia i'), chips:nodo.querySelector('.pedido'),
+  };
+  el.clientes.children[slot].appendChild(nodo);
+  juego.puestos[slot] = cliente;
+  pintarPedido(cliente);
+}
+
+function pintarPedido(cliente) {
+  const disponible = cuenta(juego.bandeja);
+  cliente.chips.innerHTML = cliente.pedido.map(id => {
+    const plato = MENU.find(p => p.id === id);
+    const listo = disponible[id] > 0;
+    if (listo) disponible[id]--;
+    return `<div class="chip${listo ? ' listo' : ''}">${plato.emoji}</div>`;
+  }).join('');
+}
+
+function quitarCliente(cliente, clase) {
+  juego.puestos[cliente.slot] = null;
+  cliente.nodo.classList.add(clase);
+  const nodo = cliente.nodo;
+  setTimeout(() => nodo.remove(), 320);
+}
+
+function servir(slot) {
+  if (!juego || juego.terminado) return;
+  const cliente = juego.puestos[slot];
+  if (!cliente || !juego.bandeja.length) return;
+
+  if (coincide(juego.bandeja, cliente.pedido)) {
+    const rapidez = cliente.paciencia / cliente.maxPaciencia;
+    juego.combo++;
+    juego.mejorCombo = Math.max(juego.mejorCombo, juego.combo);
+    const multiplicador = Math.min(5, 1 + Math.floor(juego.combo / 3));
+    const doble = juego.restante <= HORA_TERREMOTO ? 2 : 1;
+    const ganado = Math.round((60 * cliente.pedido.length * multiplicador + rapidez * 45 * cliente.pedido.length) * doble);
+
+    juego.puntaje += ganado;
+    juego.atendidos++;
+    cliente.nodo.classList.add('correcto');
+    flotar(`+${ganado}`, '#ffc53d', cliente.nodo);
+    sfx.servir();
+    pulsarCombo();
+    quitarCliente(cliente, 'correcto');
+  } else {
+    juego.puntaje = Math.max(0, juego.puntaje - 40);
+    juego.combo = 0;
+    cliente.paciencia = Math.max(1.5, cliente.paciencia - cliente.maxPaciencia * .25);
+    cliente.nodo.classList.remove('error');
+    void cliente.nodo.offsetWidth;
+    cliente.nodo.classList.add('error');
+    flotar('¡Ese no era!', '#e0243c', cliente.nodo);
+    sfx.error();
+  }
+  juego.bandeja = [];
+  pintarBandeja();
+  juego.puestos.forEach(c => c && pintarPedido(c));
+  actualizarHud();
+}
+
+function flotar(texto, color, nodo) {
+  const caja = nodo.getBoundingClientRect();
+  const n = document.createElement('div');
+  n.className = 'flota';
+  n.textContent = texto;
+  n.style.cssText += `color:${color};left:${caja.left + caja.width / 2}px;top:${caja.top}px;transform:translate(-50%,0)`;
+  document.body.appendChild(n);
+  setTimeout(() => n.remove(), 900);
+}
+
+function pulsarCombo() {
+  el.combo.classList.add('pop');
+  setTimeout(() => el.combo.classList.remove('pop'), 130);
+}
+
+function actualizarHud() {
+  const m = Math.floor(juego.restante / 60);
+  const s = Math.max(0, Math.floor(juego.restante % 60));
+  el.tiempo.textContent = `${m}:${String(s).padStart(2, '0')}`;
+  el.datoTiempo.classList.toggle('alerta', juego.restante <= HORA_TERREMOTO);
+  el.puntaje.textContent = juego.puntaje.toLocaleString('es-CL');
+  const mult = Math.min(5, 1 + Math.floor(juego.combo / 3));
+  el.combo.innerHTML = juego.combo >= 2
+    ? `${mult > 1 ? 'x' + mult : '🔥'} <small>${juego.combo} seguidos</small>`
+    : '&nbsp;<small>&nbsp;</small>';
+}
+
+/* ---------- bucle ---------- */
+function ritmoDeLlegada() {
+  const avance = 1 - juego.restante / DURACION;
+  return 3.4 - 1.9 * avance;
+}
+
+function tick(ts) {
+  if (!juego || juego.terminado) return;
+  if (!juego.ultimoTs) juego.ultimoTs = ts;
+  const dt = Math.min(.1, (ts - juego.ultimoTs) / 1000);
+  juego.ultimoTs = ts;
+
+  juego.restante -= dt;
+
+  if (!juego.avisoDado && juego.restante <= HORA_TERREMOTO) {
+    juego.avisoDado = true;
+    el.aviso.classList.add('visible');
+    acelerarCueca();
+    setTimeout(() => el.aviso.classList.remove('visible'), 3200);
+  }
+
+  juego.proximoCliente -= dt;
+  if (juego.proximoCliente <= 0) {
+    const libres = juego.puestos.map((c, i) => c ? -1 : i).filter(i => i >= 0);
+    if (libres.length) crearCliente(libres[Math.floor(Math.random() * libres.length)]);
+    juego.proximoCliente = ritmoDeLlegada();
+  }
+
+  juego.puestos.forEach(cliente => {
+    if (!cliente) return;
+    cliente.paciencia -= dt;
+    const ratio = Math.max(0, cliente.paciencia / cliente.maxPaciencia);
+    cliente.barra.style.width = (ratio * 100) + '%';
+    cliente.barra.style.background = ratio > .5 ? '#4caf6d' : ratio > .25 ? '#ffc53d' : '#e0243c';
+    if (cliente.paciencia <= 0) {
+      juego.enojados++;
+      juego.combo = 0;
+      juego.puntaje = Math.max(0, juego.puntaje - 60);
+      cliente.nodo.querySelector('.cara').textContent = '😤';
+      flotar('-60', '#e0243c', cliente.nodo);
+      sfx.enojo();
+      quitarCliente(cliente, 'se-va');
+    }
+  });
+
+  actualizarHud();
+  if (juego.restante <= 0) return terminar();
+  requestAnimationFrame(tick);
+}
+
+/* ---------- inicio y fin ---------- */
+function comenzar() {
+  const nombre = ($('inputNombre').value || '').trim().slice(0, 14) || 'Anónimo';
+  guardar('fonda:ultimoNombre', nombre);
+  juego = nuevoJuego(nombre);
+  el.clientes.querySelectorAll('.cliente').forEach(n => n.remove());
+  el.inicio.hidden = true;
+  el.final.hidden = true;
+  pintarBandeja();
+  actualizarHud();
+  crearCliente(0);
+  juego.proximoCliente = 2.2;
+  sonarCueca();
+  requestAnimationFrame(tick);
+}
+
+function rangoPara(p) {
+  if (p >= 9000) return '¡Rey de la fonda!';
+  if (p >= 6000) return 'Fondero estrella';
+  if (p >= 3500) return 'Buena mano pa’ la fonda';
+  if (p >= 1500) return 'Vas agarrando el ritmo';
+  return 'Novato de la ramada';
+}
+
+function terminar() {
+  juego.terminado = true;
+  juego.puestos.forEach(c => c && quitarCliente(c, 'se-va'));
+  callarCueca();
+  sfx.fin();
+
+  $('rango').textContent = rangoPara(juego.puntaje);
+  $('puntajeFinal').textContent = juego.puntaje.toLocaleString('es-CL');
+  $('statAtendidos').textContent = juego.atendidos;
+  $('statCombo').textContent = juego.mejorCombo;
+  $('statEnojados').textContent = juego.enojados;
+
+  const marca = {nombre:juego.nombre, puntaje:juego.puntaje, sello:Date.now()};
+  let tabla = [];
+  try { tabla = JSON.parse(leer('fonda:ranking') || '[]'); } catch (e) { tabla = []; }
+  tabla.push(marca);
+  tabla.sort((a, b) => b.puntaje - a.puntaje);
+  tabla = tabla.slice(0, 8);
+  guardar('fonda:ranking', JSON.stringify(tabla));
+
+  $('listaRanking').innerHTML = tabla.map(r => `
+    <li class="${r.sello === marca.sello ? 'yo' : ''}">
+      <span>${r.nombre.replace(/[<>&]/g, '')}</span><b>${r.puntaje.toLocaleString('es-CL')}</b>
+    </li>`).join('');
+
+  el.final.hidden = false;
+  $('inputNombre').value = '';
+}
+
+/* ---------- teclado ---------- */
+document.addEventListener('keydown', e => {
+  if (!el.inicio.hidden) {
+    if (e.key === 'Enter') comenzar();
+    return;
+  }
+  if (!el.final.hidden) {
+    if (e.key === 'Enter') { el.final.hidden = true; el.inicio.hidden = false; $('inputNombre').focus(); }
+    return;
+  }
+  const plato = MENU.find(p => p.tecla === e.key);
+  if (plato) { tomarPlato(plato.id); return; }
+  const puesto = TECLAS_PUESTO.indexOf(e.key.toUpperCase());
+  if (puesto >= 0) { servir(puesto); return; }
+  if (e.code === 'Space' || e.key === 'Backspace') { e.preventDefault(); vaciarBandeja(); }
+});
+
+$('btnJugar').addEventListener('click', comenzar);
+$('btnOtra').addEventListener('click', () => {
+  el.final.hidden = true;
+  el.inicio.hidden = false;
+  $('inputNombre').focus();
+});
+$('inputNombre').value = leer('fonda:ultimoNombre') || '';
+$('inputNombre').focus();
+})();
+</script>
+</body>
+</html>
