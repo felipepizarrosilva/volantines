@@ -109,6 +109,32 @@ body{
 }
 @media (max-height:420px){ .mando{width:58px;height:58px;font-size:22px} }
 
+.campos{display:flex;gap:8px;margin-top:14px}
+.campos .nombre{margin-top:0;min-width:0}
+.campos #inputNombre{flex:1 1 58%}
+.campos #inputSala{flex:1 1 42%}
+.nombre.sala{font-size:14px;letter-spacing:1px;text-transform:uppercase}
+.nombre.sala::placeholder{letter-spacing:0;text-transform:none}
+.ayudaSala{margin:8px 0 0;font-size:11.5px;color:#9c8aa6;line-height:1.4}
+.ayudaSala.malo{color:var(--rosa);font-weight:900}
+
+.tablero{
+  position:fixed;z-index:3;left:16px;top:96px;min-width:132px;max-width:190px;
+  background:rgba(24,12,40,.55);backdrop-filter:blur(6px);
+  border:2px solid rgba(255,244,224,.22);border-radius:12px;padding:8px 10px;
+}
+.tablero[hidden]{display:none}
+.tablero h4{
+  margin:0 0 6px;font-family:var(--display);font-size:10px;font-weight:400;
+  color:#c3b2d6;letter-spacing:.5px
+}
+.tablero ol{list-style:none;margin:0;padding:0;display:grid;gap:3px}
+.tablero li{display:flex;justify-content:space-between;gap:8px;font-size:11.5px;color:#e2d2ef}
+.tablero li span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tablero li b{font-family:var(--display);font-size:11px;color:#d9c6ea}
+.tablero li.yo span,.tablero li.yo b{color:var(--oro)}
+@media (max-width:560px){ .tablero{top:88px;left:10px;max-width:140px;padding:6px 8px} }
+
 .grito{
   position:fixed;top:32%;left:50%;transform:translate(-50%,-50%) scale(.6);
   font-family:var(--display);font-size:clamp(30px,8vw,64px);color:var(--oro);
@@ -209,13 +235,16 @@ body{
   .comodines{margin-top:10px}
   .comodines span{font-size:11.5px;padding:4px 9px}
   .nota{margin-top:7px}
-  .nombre{margin-top:10px;padding:11px 14px}
+  .campos{margin-top:10px}
+  .nombre{padding:11px 14px}
+  .ayudaSala{font-size:11px;margin-top:6px}
   .jugar{margin-top:9px;padding:13px;font-size:19px}
   .pie{margin-top:9px}
   .stats{margin:14px 0}
   .ranking{margin-bottom:12px}
 }
 @media (max-width:560px){
+  .campos{flex-direction:column}
   .placa{gap:12px;padding:7px 11px}
   .regla{grid-template-columns:62px 1fr;gap:10px}
   .regla svg{width:62px;height:46px}
@@ -252,6 +281,11 @@ body{
     <button class="mando" data-dir="sube" aria-label="Subir el volantín">▲</button>
     <button class="mando" data-dir="baja" aria-label="Bajar el volantín">▼</button>
   </div>
+</div>
+
+<div class="tablero" id="tablero" hidden>
+  <h4>En el cielo</h4>
+  <ol id="listaSala"></ol>
 </div>
 
 <div class="grito" id="grito"></div>
@@ -299,7 +333,11 @@ body{
     </div>
     <p class="nota">Los verdes te ayudan. Los rojos te complican la vida.</p>
 
-    <input class="nombre" id="inputNombre" maxlength="14" placeholder="Tu nombre" autocomplete="off">
+    <div class="campos">
+      <input class="nombre" id="inputNombre" maxlength="14" placeholder="Tu nombre" autocomplete="off">
+      <input class="nombre sala" id="inputSala" maxlength="10" placeholder="Sala: ej FONDA" autocomplete="off">
+    </div>
+    <p class="ayudaSala" id="ayudaSala">Escribe el mismo código que tus compañeros para volar juntos, hasta 8 en el mismo cielo.</p>
     <button class="jugar" id="btnJugar">Soltar el volantín</button>
     <p class="pie">Mouse, flechas, o los botones en pantalla si juegas en el celular. Dura 2 minutos, y los últimos 30 segundos se ponen feos.</p>
   </div>
@@ -384,6 +422,115 @@ async function contarMejores(puntaje) {
   const rango = r.headers.get('content-range') || '';
   const total = Number(rango.split('/')[1]);
   return Number.isFinite(total) ? total : null;
+}
+
+/* ---------- cielo compartido: salas por WebSocket contra Supabase Realtime ----------
+   Cada quien sigue en su propio cielo con sus propios rivales; lo que se comparte
+   es la presencia: ves los volantines de tu sala volando en vivo. */
+const SALA_MAX = 8;
+const MI_ID = Math.random().toString(36).slice(2, 10);
+const cielo = {
+  ws:null, topico:null, listo:false, ref:0, latido:null, cadaTanto:0,
+  vecinos:new Map(),
+};
+
+function mandarCrudo(obj) {
+  if (cielo.ws && cielo.ws.readyState === 1) cielo.ws.send(JSON.stringify(obj));
+}
+function mandar(datos) {
+  if (!cielo.listo) return;
+  mandarCrudo({
+    topic:cielo.topico,
+    event:'broadcast',
+    payload:{type:'broadcast', event:'v', payload:datos},
+    ref:String(++cielo.ref),
+  });
+}
+
+function abrirCielo(sala) {
+  return new Promise(resolve => {
+    let resuelto = false;
+    const listo = ok => { if (!resuelto) { resuelto = true; resolve(ok); } };
+    try {
+      const url = NUBE.url.replace(/^https/, 'wss').replace('/rest/v1/puntajes', '/realtime/v1/websocket')
+        + '?apikey=' + NUBE.llave + '&vsn=1.0.0';
+      const ws = new WebSocket(url);
+      cielo.ws = ws;
+      cielo.topico = 'realtime:volantines-' + sala;
+      cielo.listo = false;
+      cielo.vecinos.clear();
+
+      ws.onopen = () => {
+        mandarCrudo({
+          topic:cielo.topico,
+          event:'phx_join',
+          payload:{config:{broadcast:{self:false, ack:false}}},
+          ref:String(++cielo.ref),
+        });
+        clearInterval(cielo.latido);
+        cielo.latido = setInterval(() => mandarCrudo({topic:'phoenix', event:'heartbeat', payload:{}, ref:String(++cielo.ref)}), 25000);
+      };
+      ws.onmessage = e => {
+        let m;
+        try { m = JSON.parse(e.data); } catch (err) { return; }
+        if (m.event === 'phx_reply' && m.payload && m.payload.status === 'ok' && m.topic === cielo.topico) {
+          cielo.listo = true;
+          listo(true);
+        }
+        if (m.event === 'broadcast' && m.payload) recibirVecino(m.payload.payload);
+      };
+      ws.onerror = () => listo(false);
+      ws.onclose = () => { cielo.listo = false; clearInterval(cielo.latido); listo(false); };
+      setTimeout(() => listo(cielo.listo), 3000);
+    } catch (e) { listo(false); }
+  });
+}
+
+function cerrarCielo() {
+  if (cielo.listo) mandar({t:'chao', id:MI_ID});
+  clearInterval(cielo.latido);
+  try { if (cielo.ws) cielo.ws.close(); } catch (e) {}
+  cielo.ws = null; cielo.listo = false; cielo.vecinos.clear();
+  $('tablero').hidden = true;
+}
+
+function recibirVecino(d) {
+  if (!d || d.id === MI_ID) return;
+  if (d.t === 'chao') { cielo.vecinos.delete(d.id); return; }
+  if (d.t === 'hola') { mandarPosicion(); return; }
+  if (d.t !== 'pos') return;
+  const previo = cielo.vecinos.get(d.id);
+  cielo.vecinos.set(d.id, {
+    nombre:String(d.n || '').slice(0, 14),
+    mx:+d.x || 0, my:+d.y || 0,
+    x:previo ? previo.x : +d.x || 0,
+    y:previo ? previo.y : +d.y || 0,
+    ang:+d.a || 0, pts:d.p | 0, estrella:!!d.e,
+    visto:performance.now(),
+  });
+}
+
+function mandarPosicion() {
+  if (!j || j.terminado) return;
+  mandar({
+    t:'pos', id:MI_ID, n:j.nombre,
+    x:+(j.kite.x / W).toFixed(4), y:+(j.kite.y / suelo).toFixed(4),
+    a:+j.kite.ang.toFixed(3), p:j.puntaje, e:j.ef.sombrero > 0,
+  });
+}
+
+/* marcador de la sala, refrescado de a poco para no castigar el DOM */
+let refrescoSala = 0;
+function pintarSala(ahora) {
+  if (!cielo.listo || ahora - refrescoSala < 350) return;
+  refrescoSala = ahora;
+  const filas = [{nombre:j.nombre, pts:j.puntaje, mio:true}];
+  cielo.vecinos.forEach(v => filas.push({nombre:v.nombre, pts:v.pts, mio:false}));
+  filas.sort((a, b) => b.pts - a.pts);
+  $('tablero').hidden = false;
+  $('listaSala').innerHTML = filas.slice(0, SALA_MAX).map(f =>
+    `<li class="${f.mio ? 'yo' : ''}"><span>${limpio(f.nombre)}</span><b>${f.pts.toLocaleString('es-CL')}</b></li>`
+  ).join('');
 }
 
 /* ---------- lienzo ---------- */
@@ -1018,6 +1165,17 @@ function actualizar(dt) {
   if (q.salto > 0) q.salto = Math.max(0, q.salto - dt * 2.1);
   if (q.ladrido > 0) q.ladrido = Math.max(0, q.ladrido - dt);
 
+  if (cielo.listo) {
+    cielo.cadaTanto -= dt;
+    if (cielo.cadaTanto <= 0) { cielo.cadaTanto = .125; mandarPosicion(); }
+    const suave = Math.min(1, dt * 11);
+    cielo.vecinos.forEach(vec => {
+      vec.x += (vec.mx - vec.x) * suave;
+      vec.y += (vec.my - vec.y) * suave;
+    });
+    pintarSala(performance.now());
+  }
+
   j.desplazamiento += v * dt;
   j.ramadas.forEach(r => r.x -= v * dt);
   j.ramadas = j.ramadas.filter(r => r.x + r.ancho > -140);
@@ -1492,6 +1650,36 @@ function escena() {
     }
   });
 
+  /* volantines de la sala: fantasmas con nombre, no se pueden cortar */
+  if (cielo.listo) {
+    const ahora = performance.now();
+    cielo.vecinos.forEach((v, id) => {
+      if (ahora - v.visto > 4500) { cielo.vecinos.delete(id); return; }
+      const x = v.x * W, y = v.y * suelo;
+      cx.save();
+      cx.globalAlpha = .45;
+      cx.strokeStyle = 'rgba(255,244,224,.4)';
+      cx.lineWidth = 1;
+      cx.setLineDash([4, 5]);
+      cx.beginPath();
+      cx.moveTo(x, y + 16 * S);
+      cx.lineTo(x - 70 * S, y + 120 * S);
+      cx.stroke();
+      cx.restore();
+
+      volantin(x, y, v.ang, 17 * S, v.estrella ? '#ffd166' : '#8fb7ff', '#fff4e0', ahora / 260, .62);
+
+      cx.save();
+      cx.globalAlpha = .85;
+      cx.fillStyle = '#fff4e0';
+      cx.font = `900 ${11.5 * S}px ${FUENTE_TEXTO}`;
+      cx.textAlign = 'center';
+      cx.textBaseline = 'middle';
+      cx.fillText(limpio(v.nombre), x, y - 26 * S);
+      cx.restore();
+    });
+  }
+
   /* hilo y volantín del jugador */
   const k = j.kite;
   const anclaX = 26 * S, anclaY = H - 8 * S;
@@ -1593,9 +1781,38 @@ function paso(ts) {
 }
 
 /* ---------- inicio y fin ---------- */
-function comenzar() {
+async function comenzar() {
   const nombre = ($('inputNombre').value || '').trim().slice(0, 14) || 'Anónimo';
   guardar('volantin:ultimoNombre', nombre);
+
+  const sala = ($('inputSala').value || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10);
+  guardar('volantin:sala', sala);
+  const ayuda = $('ayudaSala');
+  ayuda.classList.remove('malo');
+  cerrarCielo();
+  if (sala) {
+    ayuda.textContent = 'Entrando a la sala ' + sala + '…';
+    const botón = $('btnJugar');
+    botón.disabled = true;
+    const entró = await abrirCielo(sala);
+    botón.disabled = false;
+    if (entró) {
+      mandar({t:'hola', id:MI_ID});
+      await new Promise(r => setTimeout(r, 900));
+      if (cielo.vecinos.size >= SALA_MAX) {
+        cerrarCielo();
+        ayuda.textContent = `La sala ${sala} está llena (${SALA_MAX} de ${SALA_MAX}). Prueba con otro código.`;
+        ayuda.classList.add('malo');
+        return;
+      }
+      ayuda.textContent = `Sala ${sala}: ${cielo.vecinos.size + 1} en el cielo.`;
+    } else {
+      ayuda.textContent = 'No se pudo entrar a la sala; juegas solo igual.';
+      ayuda.classList.add('malo');
+    }
+  } else {
+    ayuda.textContent = 'Escribe el mismo código que tus compañeros para volar juntos, hasta 8 en el mismo cielo.';
+  }
   redimensionar();
   j = nuevoJuego(nombre);
   for (let i = 0; i < 5; i++) nacerNube(true);
@@ -1710,6 +1927,7 @@ function terminar() {
   guardar('volantin:ranking', JSON.stringify(tabla));
   pintarLista(tabla.map(r => ({nombre:r.nombre, puntaje:r.puntaje, mio:r.sello === marca.sello})));
   $('pantallaFinal').hidden = false;
+  cerrarCielo();
   sincronizar(marca);
 }
 
@@ -1759,6 +1977,7 @@ function volverAlInicio() {
 $('btnJugar').addEventListener('click', comenzar);
 $('btnOtra').addEventListener('click', volverAlInicio);
 $('inputNombre').value = leer('volantin:ultimoNombre') || '';
+$('inputSala').value = leer('volantin:sala') || '';
 $('inputNombre').focus({preventScroll:true});
 pintarHilos();
 dibujar();
